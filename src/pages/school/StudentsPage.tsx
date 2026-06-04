@@ -1,0 +1,257 @@
+import { useEffect, useState } from 'react'
+import { useAuth } from '../../context/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { Student } from '../../types'
+import LoadingSpinner from '../../components/LoadingSpinner'
+import { GraduationCap, Plus, Trash2, X, Search, Phone } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+export default function StudentsPage() {
+  const { profile } = useAuth()
+  const [students, setStudents] = useState<Student[]>([])
+  const [filtered, setFiltered] = useState<Student[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [form, setForm] = useState({ name: '', class: '', fee_amount: '', parent_phone: '' })
+
+  useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
+
+  useEffect(() => {
+    const q = search.toLowerCase()
+    setFiltered(
+      q ? students.filter((s) => s.name.toLowerCase().includes(q) || s.class.toLowerCase().includes(q)) : students
+    )
+  }, [search, students])
+
+  async function loadStudents() {
+    if (!profile?.school_id) return
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('school_id', profile.school_id)
+        .order('name')
+      if (error) throw error
+      setStudents(data ?? [])
+      setFiltered(data ?? [])
+    } catch {
+      toast.error('Failed to load students')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.name.trim() || !form.class.trim() || !form.fee_amount) {
+      toast.error('Name, class and fee are required')
+      return
+    }
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('students').insert({
+        school_id: profile?.school_id,
+        name: form.name.trim(),
+        class: form.class.trim(),
+        fee_amount: parseFloat(form.fee_amount),
+        parent_phone: form.parent_phone.trim() || null,
+      })
+      if (error) throw error
+      toast.success('Student added!')
+      setShowModal(false)
+      setForm({ name: '', class: '', fee_amount: '', parent_phone: '' })
+      loadStudents()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add student')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(student: Student) {
+    if (!confirm(`Remove "${student.name}"? This also removes all their fee records.`)) return
+    setDeleting(student.id)
+    try {
+      const { error } = await supabase.from('students').delete().eq('id', student.id)
+      if (error) throw error
+      toast.success(`${student.name} removed`)
+      loadStudents()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove student')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  if (loading) return <LoadingSpinner fullPage text="Loading students..." />
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Students</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{students.length} enrolled</p>
+        </div>
+        <button onClick={() => setShowModal(true)} className="btn-primary text-sm">
+          <Plus size={16} />
+          <span className="hidden sm:inline">Add Student</span>
+          <span className="sm:hidden">Add</span>
+        </button>
+      </div>
+
+      {/* Search */}
+      {students.length > 0 && (
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or class..."
+            className="input-field pl-9"
+          />
+        </div>
+      )}
+
+      {/* Student List */}
+      {students.length === 0 ? (
+        <div className="card text-center py-12">
+          <GraduationCap size={48} className="text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium text-lg">No students yet</p>
+          <p className="text-gray-400 text-sm mt-1">Add your first student to get started</p>
+          <button onClick={() => setShowModal(true)} className="btn-primary mt-5 mx-auto">
+            <Plus size={16} /> Add First Student
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card text-center py-8">
+          <p className="text-gray-500">No students match "{search}"</p>
+        </div>
+      ) : (
+        <div className="card !p-0 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900 text-sm">Student List</h2>
+            <span className="text-xs text-gray-500">{filtered.length} shown</span>
+          </div>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Class</th>
+                  <th>Monthly Fee</th>
+                  <th>Phone</th>
+                  <th className="text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((student) => (
+                  <tr key={student.id}>
+                    <td>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-indigo-600 text-xs font-semibold">
+                            {student.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="font-medium text-gray-900 text-sm">{student.name}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium">
+                        {student.class}
+                      </span>
+                    </td>
+                    <td className="font-semibold text-gray-900 text-sm">
+                      {Number(student.fee_amount).toLocaleString()}
+                    </td>
+                    <td>
+                      {student.parent_phone ? (
+                        <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                          <Phone size={11} /> {student.parent_phone}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      <button
+                        onClick={() => handleDelete(student)}
+                        disabled={deleting === student.id}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        {deleting === student.id
+                          ? <div className="h-4 w-4 border border-gray-400 border-t-red-500 rounded-full animate-spin" />
+                          : <Trash2 size={15} />}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Footer */}
+      {students.length > 0 && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
+          <span className="text-sm text-indigo-700 font-medium">Total Monthly Revenue</span>
+          <span className="text-lg font-bold text-indigo-700">
+            {students.reduce((s, st) => s + Number(st.fee_amount), 0).toLocaleString()}
+          </span>
+        </div>
+      )}
+
+      {/* Add Student Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900 text-lg">Add New Student</h3>
+              <button onClick={() => setShowModal(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAdd} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Student Name *</label>
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Full name" className="input-field" required autoFocus />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Class *</label>
+                  <input type="text" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })}
+                    placeholder="e.g. 5A" className="input-field" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Fee Amount *</label>
+                  <input type="number" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })}
+                    placeholder="Monthly fee" className="input-field" min="0" step="0.01" required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Parent Phone</label>
+                <input type="tel" value={form.parent_phone} onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
+                  placeholder="Optional contact number" className="input-field" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={saving} className="btn-primary flex-1">
+                  {saving
+                    ? <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+                    : 'Add Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

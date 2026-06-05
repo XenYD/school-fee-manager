@@ -10,6 +10,7 @@ import {
 import PaymentModal from '../../components/PaymentModal'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import EditFeeModal from '../../components/EditFeeModal'
+import SetExamFeeModal from '../../components/SetExamFeeModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { generateReceipt, generateDefaultersReport, generateSummaryReport } from '../../utils/pdf'
 import { exportDefaultersExcel, exportMonthlyReportExcel, parseExcel, downloadExcelTemplate } from '../../utils/excel'
@@ -19,6 +20,7 @@ import {
   CheckCircle2, XCircle, Clock, AlertCircle, FileText, Download, FileDown,
   Phone, Users, BookOpen, TrendingUp, LayoutList, LayoutGrid, BarChart3, Table2, PenLine,
 } from 'lucide-react'
+
 
 type TabType = 'fees' | 'defaulters' | 'summary'
 type FilterType = 'all' | 'paid' | 'partial' | 'unpaid'
@@ -67,6 +69,7 @@ export default function SchoolDetailPage() {
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null)
   const [historyTarget, setHistoryTarget] = useState<HistoryTarget | null>(null)
   const [editFeeStudent, setEditFeeStudent] = useState<StudentWithFee | null>(null)
+  const [showSetExamFee, setShowSetExamFee] = useState(false)
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [markingAllPaid, setMarkingAllPaid] = useState(false)
@@ -507,6 +510,15 @@ export default function SchoolDetailPage() {
                 </button>
               )}
 
+              {/* Set Exam Fee button */}
+              <button
+                onClick={() => setShowSetExamFee(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                <BookOpen size={14} />
+                Set Exam Fee
+              </button>
+
               <div className="relative flex-1 min-w-[160px]">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search student..." className="input-field pl-8 py-2 text-sm w-full" />
@@ -795,6 +807,14 @@ export default function SchoolDetailPage() {
           student={editFeeStudent}
           onClose={() => setEditFeeStudent(null)}
           onSaved={() => { setEditFeeStudent(null); loadData() }}
+        />
+      )}
+
+      {showSetExamFee && schoolId && (
+        <SetExamFeeModal
+          schoolId={schoolId}
+          onClose={() => setShowSetExamFee(false)}
+          onApplied={() => { setShowSetExamFee(false); loadData() }}
         />
       )}
     </div>

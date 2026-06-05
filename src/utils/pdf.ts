@@ -49,24 +49,33 @@ export function generateReceipt(opts: ReceiptOptions): void {
   doc.setTextColor(30, 30, 30)
   let y = 36
 
-  // Student info box
+  // Student info box — taller to avoid overlapping text
+  const boxH = opts.parentPhone ? 34 : 28
   doc.setFillColor(245, 247, 255)
-  doc.roundedRect(margin, y, pageW - margin * 2, 22, 3, 3, 'F')
+  doc.roundedRect(margin, y, pageW - margin * 2, boxH, 3, 3, 'F')
   doc.setFontSize(9)
+
+  // Left column: Student label, name, class
   doc.setFont('helvetica', 'bold')
   doc.text('Student', margin + 4, y + 6)
   doc.setFont('helvetica', 'normal')
-  doc.text(opts.studentName, margin + 4, y + 12)
-  doc.text(opts.studentClass, margin + 4, y + 18)
+  doc.text(opts.studentName, margin + 4, y + 13)
+  doc.text(opts.studentClass, margin + 4, y + 20)
+
+  // Right column: Date on top, Period below, Parent below that
+  doc.setFont('helvetica', 'bold')
+  doc.text('Date:', pageW - margin - 4, y + 6, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.text(dateStr, pageW - margin - 4, y + 13, { align: 'right' })
+  doc.text(`Period: ${periodStr}`, pageW - margin - 4, y + 20, { align: 'right' })
+
   if (opts.parentPhone) {
     doc.setTextColor(99, 102, 241)
-    doc.text(`Parent: ${opts.parentPhone}`, pageW / 2, y + 12)
+    doc.text(`Parent: ${opts.parentPhone}`, margin + 4, y + 29)
     doc.setTextColor(30, 30, 30)
   }
-  doc.text(`Period: ${periodStr}`, pageW / 2, y + 18)
-  doc.text(`Date: ${dateStr}`, pageW - margin - 4, y + 12, { align: 'right' })
 
-  y += 28
+  y += boxH + 6
 
   // Fee details table — use only ASCII characters in all cell values
   const isPartial = opts.remaining > 0

@@ -9,6 +9,7 @@ import {
 } from '../../types'
 import PaymentModal from '../../components/PaymentModal'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
+import EditFeeModal from '../../components/EditFeeModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { generateReceipt, generateDefaultersReport, generateSummaryReport } from '../../utils/pdf'
 import { exportDefaultersExcel, exportMonthlyReportExcel, parseExcel, downloadExcelTemplate } from '../../utils/excel'
@@ -16,7 +17,7 @@ import toast from 'react-hot-toast'
 import {
   ArrowLeft, Plus, Trash2, Upload, X, Search, ChevronLeft, ChevronRight,
   CheckCircle2, XCircle, Clock, AlertCircle, FileText, Download, FileDown,
-  Phone, Users, BookOpen, TrendingUp, LayoutList, LayoutGrid, BarChart3, Table2,
+  Phone, Users, BookOpen, TrendingUp, LayoutList, LayoutGrid, BarChart3, Table2, PenLine,
 } from 'lucide-react'
 
 type TabType = 'fees' | 'defaulters' | 'summary'
@@ -65,6 +66,7 @@ export default function SchoolDetailPage() {
 
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null)
   const [historyTarget, setHistoryTarget] = useState<HistoryTarget | null>(null)
+  const [editFeeStudent, setEditFeeStudent] = useState<StudentWithFee | null>(null)
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [markingAllPaid, setMarkingAllPaid] = useState(false)
@@ -238,15 +240,6 @@ export default function SchoolDetailPage() {
       await supabase.from('fee_records').update({ paid_amount: newPaid, status: newStatus, paid_by: profile?.id }).eq('id', recordId)
 
       toast.success(newStatus === 'paid' ? `Fully paid · ${method === 'cash' ? 'Cash' : 'Online'}` : `Partial recorded`)
-
-      const resetType = school?.fee_reset_type ?? 'monthly'
-      generateReceipt({
-        schoolName: school?.name ?? 'School', studentName: student.name, studentClass: student.class,
-        parentPhone: student.parent_phone, feeType, dueAmount: currentDue,
-        amountPaid: amount, totalPaidSoFar: newPaid, remaining: currentDue - newPaid,
-        paymentMethod: method, month: periodMonth, year: periodYear,
-        periodLabel: getPeriodLabel(periodMonth, periodYear, resetType), resetType,
-      })
 
       loadData()
     } catch (err) {
@@ -564,6 +557,7 @@ export default function SchoolDetailPage() {
                     onHistory={(rec, s) => setHistoryTarget({ record: rec, student: s })}
                     onReceipt={handleDownloadReceipt}
                     onDelete={handleDeleteStudent}
+                    onEditFee={(s) => setEditFeeStudent(s)}
                   />
                 ))}
               </div>
@@ -578,6 +572,7 @@ export default function SchoolDetailPage() {
                     onPay={(s, ft, rec) => setPaymentTarget({ student: s, feeType: ft, record: rec })}
                     onMarkUnpaid={handleMarkUnpaid}
                     onDelete={handleDeleteStudent}
+                    onEditFee={(s) => setEditFeeStudent(s)}
                   />
                 ))}
               </div>
@@ -794,6 +789,14 @@ export default function SchoolDetailPage() {
           onReset={() => { setHistoryTarget(null); loadData() }}
         />
       )}
+
+      {editFeeStudent && (
+        <EditFeeModal
+          student={editFeeStudent}
+          onClose={() => setEditFeeStudent(null)}
+          onSaved={() => { setEditFeeStudent(null); loadData() }}
+        />
+      )}
     </div>
   )
 }
@@ -812,9 +815,10 @@ interface AdminCardProps {
   onHistory: (rec: FeeRecord, s: StudentWithFee) => void
   onReceipt: (s: StudentWithFee, ft: FeeType) => void
   onDelete: (s: StudentWithFee) => void
+  onEditFee: (s: StudentWithFee) => void
 }
 
-function AdminStudentCard({ student, periodMonth, periodYear, processingId, generatingPdf, deleting, onPay, onMarkUnpaid, onHistory, onReceipt, onDelete }: AdminCardProps) {
+function AdminStudentCard({ student, periodMonth, periodYear, processingId, generatingPdf, deleting, onPay, onMarkUnpaid, onHistory, onReceipt, onDelete, onEditFee }: AdminCardProps) {
   const hasSf = Number(student.fee_amount) > 0
   const hasEf = Number(student.exam_fee_amount) > 0
   return (
@@ -834,6 +838,13 @@ function AdminStudentCard({ student, periodMonth, periodYear, processingId, gene
             )}
           </div>
         </div>
+        <button
+          onClick={() => onEditFee(student)}
+          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0"
+          title="Edit fee amounts"
+        >
+          <PenLine size={13} />
+        </button>
         <button onClick={() => onDelete(student)} disabled={deleting === student.id}
           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg flex-shrink-0">
           {deleting === student.id ? <div className="h-4 w-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" /> : <Trash2 size={14} />}
@@ -906,9 +917,10 @@ interface AdminGridCardProps {
   onPay: (s: StudentWithFee, ft: FeeType, rec: FeeRecord | null) => void
   onMarkUnpaid: (s: StudentWithFee, ft: FeeType) => void
   onDelete: (s: StudentWithFee) => void
+  onEditFee: (s: StudentWithFee) => void
 }
 
-function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, deleting, onPay, onMarkUnpaid, onDelete }: AdminGridCardProps) {
+function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, deleting, onPay, onMarkUnpaid, onDelete, onEditFee }: AdminGridCardProps) {
   const sfS = student.school_fee_record?.status ?? 'unpaid'
   const efS = student.exam_fee_record?.status ?? 'unpaid'
   const sfOv = getDaysOverdue(student.school_fee_record, periodMonth, periodYear)
@@ -922,6 +934,13 @@ function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, 
           <p className="font-semibold text-gray-900 text-sm truncate">{student.name}</p>
           <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{student.class}</span>
         </div>
+        <button
+          onClick={() => onEditFee(student)}
+          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+          title="Edit fee amounts"
+        >
+          <PenLine size={13} />
+        </button>
         <button onClick={() => onDelete(student)} disabled={deleting === student.id} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
           {deleting === student.id ? <div className="h-3 w-3 border border-gray-300 border-t-red-500 rounded-full animate-spin" /> : <Trash2 size={13} />}
         </button>

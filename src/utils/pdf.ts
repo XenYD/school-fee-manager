@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable'
 import type { FeeType, PaymentMethod, FeeStatus } from '../types'
 import { FEE_TYPE_LABELS, getPeriodLabel } from '../types'
 
-// ─── Receipt ────────────────────────────────────────────────────────────────
+// ── Receipt ──────────────────────────────────────────────────────────────────
 
 export interface ReceiptOptions {
   schoolName: string
@@ -34,10 +34,9 @@ export function generateReceipt(opts: ReceiptOptions): void {
   })
   const periodStr = opts.periodLabel ?? getPeriodLabel(opts.month, opts.year, opts.resetType ?? 'monthly')
 
-  // Header background
+  // Header
   doc.setFillColor(79, 70, 229)
   doc.rect(0, 0, pageW, 28, 'F')
-
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
@@ -50,7 +49,7 @@ export function generateReceipt(opts: ReceiptOptions): void {
   doc.setTextColor(30, 30, 30)
   let y = 36
 
-  // Student info
+  // Student info box
   doc.setFillColor(245, 247, 255)
   doc.roundedRect(margin, y, pageW - margin * 2, 22, 3, 3, 'F')
   doc.setFontSize(9)
@@ -69,16 +68,17 @@ export function generateReceipt(opts: ReceiptOptions): void {
 
   y += 28
 
-  // Fee details table
+  // Fee details table — use only ASCII characters in all cell values
   const isPartial = opts.remaining > 0
   const methodLabel = opts.paymentMethod === 'cash' ? 'Cash' : 'Online Transfer'
+  const feeTypeLabel = FEE_TYPE_LABELS[opts.feeType]
 
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
     head: [['Description', 'Amount']],
     body: [
-      [`${FEE_TYPE_LABELS[opts.feeType]} — ${periodStr}`, `Rs ${opts.dueAmount.toLocaleString()}`],
+      [`${feeTypeLabel} - ${periodStr}`, `Rs ${opts.dueAmount.toLocaleString()}`],
       ['Paid This Transaction', `Rs ${opts.amountPaid.toLocaleString()}`],
       opts.totalPaidSoFar !== opts.amountPaid
         ? ['Total Paid So Far', `Rs ${opts.totalPaidSoFar.toLocaleString()}`]
@@ -94,16 +94,17 @@ export function generateReceipt(opts: ReceiptOptions): void {
 
   const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
 
-  // Status banner
-  const bannerColor = isPartial ? [251, 191, 36] : [34, 197, 94]
+  // Status banner — plain ASCII only, no special characters
+  const bannerColor = isPartial ? [245, 158, 11] : [22, 163, 74]
   doc.setFillColor(bannerColor[0], bannerColor[1], bannerColor[2])
   doc.rect(margin, finalY, pageW - margin * 2, 9, 'F')
-  doc.setTextColor(isPartial ? 120 : 255, isPartial ? 50 : 255, isPartial ? 0 : 255)
   doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(255, 255, 255)
   doc.text(
-    isPartial ? `⚠ Partial Payment — Rs ${opts.remaining.toLocaleString()} remaining` : '✓ Fully Paid',
+    isPartial
+      ? `PARTIAL PAYMENT - Rs ${opts.remaining.toLocaleString()} remaining`
+      : 'FULLY PAID',
     pageW / 2,
     finalY + 5.5,
     { align: 'center' }
@@ -118,7 +119,7 @@ export function generateReceipt(opts: ReceiptOptions): void {
   doc.save(filename)
 }
 
-// ─── Defaulters Report ───────────────────────────────────────────────────────
+// ── Defaulters Report ─────────────────────────────────────────────────────────
 
 export interface DefaulterEntry {
   name: string
@@ -151,7 +152,7 @@ export function generateDefaultersReport(opts: DefaultersReportOptions): void {
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
-  doc.text(`${opts.schoolName} — Defaulters Report`, pageW / 2, 10, { align: 'center' })
+  doc.text(`${opts.schoolName} - Defaulters Report`, pageW / 2, 10, { align: 'center' })
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.text(
@@ -177,9 +178,9 @@ export function generateDefaultersReport(opts: DefaultersReportOptions): void {
       d.dueAmount.toLocaleString(),
       d.paidAmount.toLocaleString(),
       d.remaining.toLocaleString(),
-      d.daysOverdue > 0 ? `${d.daysOverdue}d` : '—',
+      d.daysOverdue > 0 ? `${d.daysOverdue}d` : '-',
       d.status.charAt(0).toUpperCase() + d.status.slice(1),
-      d.parentPhone ?? '—',
+      d.parentPhone ?? '-',
     ]),
     theme: 'striped',
     headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold', fontSize: 8 },
@@ -195,7 +196,7 @@ export function generateDefaultersReport(opts: DefaultersReportOptions): void {
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index === 7) {
         const val = String(data.cell.raw)
-        if (val !== '—') data.cell.styles.textColor = [220, 38, 38]
+        if (val !== '-') data.cell.styles.textColor = [220, 38, 38]
       }
       if (data.section === 'body' && data.column.index === 8) {
         const val = String(data.cell.raw).toLowerCase()
@@ -207,7 +208,6 @@ export function generateDefaultersReport(opts: DefaultersReportOptions): void {
 
   const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
 
-  // Summary row
   const totalDue = opts.defaulters.reduce((s, d) => s + d.dueAmount, 0)
   const totalPaid = opts.defaulters.reduce((s, d) => s + d.paidAmount, 0)
   const totalRemaining = opts.defaulters.reduce((s, d) => s + d.remaining, 0)
@@ -226,7 +226,7 @@ export function generateDefaultersReport(opts: DefaultersReportOptions): void {
   doc.save(filename)
 }
 
-// ─── Monthly Summary Report ─────────────────────────────────────────────────
+// ── Monthly Summary Report ────────────────────────────────────────────────────
 
 export interface ClassSummaryRow {
   className: string
@@ -260,7 +260,7 @@ export function generateSummaryReport(opts: SummaryReportOptions): void {
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
-  doc.text(`${opts.schoolName} — Monthly Summary Report`, pageW / 2, 10, { align: 'center' })
+  doc.text(`${opts.schoolName} - Monthly Summary Report`, pageW / 2, 10, { align: 'center' })
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.text(
@@ -273,11 +273,9 @@ export function generateSummaryReport(opts: SummaryReportOptions): void {
   doc.setTextColor(30, 30, 30)
   let y = 28
 
-  // Overall stats
+  // Overall stats box
   doc.setFillColor(245, 247, 255)
   doc.roundedRect(margin, y, pageW - margin * 2, 18, 3, 3, 'F')
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
   const stats = [
     { label: 'Total Students', value: String(opts.totalStudents) },
     { label: 'Total Expected', value: `Rs ${opts.totalExpected.toLocaleString()}` },
@@ -285,10 +283,9 @@ export function generateSummaryReport(opts: SummaryReportOptions): void {
     { label: 'Total Pending', value: `Rs ${opts.totalPending.toLocaleString()}` },
     {
       label: 'Collection %',
-      value:
-        opts.totalExpected > 0
-          ? `${Math.round((opts.totalCollected / opts.totalExpected) * 100)}%`
-          : '0%',
+      value: opts.totalExpected > 0
+        ? `${Math.round((opts.totalCollected / opts.totalExpected) * 100)}%`
+        : '0%',
     },
   ]
   const colWidth = (pageW - margin * 2) / stats.length
@@ -296,8 +293,10 @@ export function generateSummaryReport(opts: SummaryReportOptions): void {
     const x = margin + i * colWidth + colWidth / 2
     doc.setTextColor(99, 102, 241)
     doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
     doc.text(stat.value, x, y + 8, { align: 'center' })
     doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
     doc.setTextColor(120, 120, 120)
     doc.text(stat.label, x, y + 14, { align: 'center' })
   })
@@ -317,15 +316,15 @@ export function generateSummaryReport(opts: SummaryReportOptions): void {
     head: [
       [
         'Class', 'Students',
-        'School Fee Expected', 'School Fee Collected', 'School Fee Pending', 'SF %',
-        'Exam Fee Expected', 'Exam Fee Collected', 'Exam Fee Pending',
+        'SF Expected', 'SF Collected', 'SF Pending', 'SF %',
+        'EF Expected', 'EF Collected', 'EF Pending',
       ],
     ],
     body: opts.classSummary.map((row) => {
       const sfPending = row.schoolFeeExpected - row.schoolFeeCollected
       const sfPct = row.schoolFeeExpected > 0
         ? `${Math.round((row.schoolFeeCollected / row.schoolFeeExpected) * 100)}%`
-        : '—'
+        : 'N/A'
       const efPending = row.examFeeExpected - row.examFeeCollected
       return [
         row.className,
@@ -334,9 +333,9 @@ export function generateSummaryReport(opts: SummaryReportOptions): void {
         row.schoolFeeCollected.toLocaleString(),
         sfPending.toLocaleString(),
         sfPct,
-        row.examFeeExpected > 0 ? row.examFeeExpected.toLocaleString() : '—',
-        row.examFeeCollected > 0 ? row.examFeeCollected.toLocaleString() : '—',
-        row.examFeeExpected > 0 ? efPending.toLocaleString() : '—',
+        row.examFeeExpected > 0 ? row.examFeeExpected.toLocaleString() : 'N/A',
+        row.examFeeCollected > 0 ? row.examFeeCollected.toLocaleString() : 'N/A',
+        row.examFeeExpected > 0 ? efPending.toLocaleString() : 'N/A',
       ]
     }),
     foot: [

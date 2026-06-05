@@ -3,7 +3,8 @@ import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { GraduationCap, Plus, Trash2, X, Search, Phone, ListFilter, LayoutList, LayoutGrid } from 'lucide-react'
+import EditFeeModal from '../../components/EditFeeModal'
+import { GraduationCap, Plus, Trash2, X, Search, Phone, ListFilter, LayoutList, LayoutGrid, PenLine } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
@@ -16,6 +17,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('')
   const [selectedClass, setSelectedClass] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [editFeeStudent, setEditFeeStudent] = useState<Student | null>(null)
   const [form, setForm] = useState({ name: '', class: '', fee_amount: '', exam_fee_amount: '', parent_phone: '' })
 
   useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
@@ -295,15 +297,24 @@ export default function StudentsPage() {
                         )}
                       </td>
                       <td className="text-right">
-                        <button
-                          onClick={() => handleDelete(student)}
-                          disabled={deleting === student.id}
-                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          {deleting === student.id
-                            ? <div className="h-4 w-4 border border-gray-400 border-t-red-500 rounded-full animate-spin" />
-                            : <Trash2 size={15} />}
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setEditFeeStudent(student)}
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Edit fee amounts"
+                          >
+                            <PenLine size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(student)}
+                            disabled={deleting === student.id}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            {deleting === student.id
+                              ? <div className="h-4 w-4 border border-gray-400 border-t-red-500 rounded-full animate-spin" />
+                              : <Trash2 size={15} />}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -320,17 +331,26 @@ export default function StudentsPage() {
                   key={student.id}
                   className="relative bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center gap-2.5 hover:border-indigo-200 hover:shadow-sm transition-all"
                 >
-                  {/* Delete button */}
-                  <button
-                    onClick={() => handleDelete(student)}
-                    disabled={deleting === student.id}
-                    className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Remove student"
-                  >
-                    {deleting === student.id
-                      ? <div className="h-3.5 w-3.5 border border-gray-300 border-t-red-500 rounded-full animate-spin" />
-                      : <Trash2 size={13} />}
-                  </button>
+                  {/* Action buttons */}
+                  <div className="absolute top-2 right-2 flex items-center gap-0.5">
+                    <button
+                      onClick={() => setEditFeeStudent(student)}
+                      className="p-1 text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit fee amounts"
+                    >
+                      <PenLine size={12} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(student)}
+                      disabled={deleting === student.id}
+                      className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remove student"
+                    >
+                      {deleting === student.id
+                        ? <div className="h-3.5 w-3.5 border border-gray-300 border-t-red-500 rounded-full animate-spin" />
+                        : <Trash2 size={13} />}
+                    </button>
+                  </div>
 
                   {/* Avatar */}
                   <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mt-1 flex-shrink-0">
@@ -425,6 +445,15 @@ export default function StudentsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Edit Fee Modal */}
+      {editFeeStudent && (
+        <EditFeeModal
+          student={editFeeStudent}
+          onClose={() => setEditFeeStudent(null)}
+          onSaved={() => { setEditFeeStudent(null); loadStudents() }}
+        />
       )}
     </div>
   )

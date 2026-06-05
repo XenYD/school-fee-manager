@@ -10,6 +10,7 @@ import {
 } from '../../types'
 import PaymentModal from '../../components/PaymentModal'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
+import EditFeeModal from '../../components/EditFeeModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { generateReceipt, generateDefaultersReport, generateSummaryReport } from '../../utils/pdf'
 import { exportDefaultersExcel, exportMonthlyReportExcel } from '../../utils/excel'
@@ -17,7 +18,7 @@ import toast from 'react-hot-toast'
 import {
   CheckCircle2, XCircle, Clock, AlertCircle, ChevronLeft, ChevronRight,
   Search, X, Phone, FileText, LayoutList, LayoutGrid, Download,
-  TrendingUp, Users, BookOpen, FileDown, Table2, BarChart3,
+  TrendingUp, Users, BookOpen, FileDown, Table2, BarChart3, PenLine,
 } from 'lucide-react'
 
 type TabType = 'fees' | 'defaulters' | 'summary'
@@ -51,6 +52,7 @@ export default function FeesPage() {
 
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null)
   const [historyTarget, setHistoryTarget] = useState<HistoryTarget | null>(null)
+  const [editFeeStudent, setEditFeeStudent] = useState<StudentWithFee | null>(null)
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [markingAllPaid, setMarkingAllPaid] = useState(false)
@@ -169,24 +171,6 @@ export default function FeesPage() {
       if (upErr) throw upErr
 
       toast.success(newStatus === 'paid' ? `Fully paid · ${method === 'cash' ? 'Cash' : 'Online'}` : `Partial recorded · ${method === 'cash' ? 'Cash' : 'Online'}`)
-
-      // Auto-generate receipt
-      generateReceipt({
-        schoolName,
-        studentName: student.name,
-        studentClass: student.class,
-        parentPhone: student.parent_phone,
-        feeType,
-        dueAmount: currentDue,
-        amountPaid: amount,
-        totalPaidSoFar: newPaid,
-        remaining: currentDue - newPaid,
-        paymentMethod: method,
-        month: periodMonth,
-        year: periodYear,
-        periodLabel: getPeriodLabel(periodMonth, periodYear, resetType),
-        resetType,
-      })
 
       loadData()
     } catch (err) {
@@ -642,6 +626,7 @@ export default function FeesPage() {
                     onMarkUnpaid={handleMarkUnpaid}
                     onHistory={(rec, s) => setHistoryTarget({ record: rec, student: s })}
                     onReceipt={handleDownloadReceipt}
+                    onEditFee={(s) => setEditFeeStudent(s)}
                   />
                 ))}
               </div>
@@ -656,6 +641,7 @@ export default function FeesPage() {
                     processingId={processingId}
                     onPay={(s, ft, rec) => setPaymentTarget({ student: s, feeType: ft, record: rec })}
                     onMarkUnpaid={handleMarkUnpaid}
+                    onEditFee={(s) => setEditFeeStudent(s)}
                   />
                 ))}
               </div>
@@ -889,6 +875,15 @@ export default function FeesPage() {
           onReset={() => { setHistoryTarget(null); loadData() }}
         />
       )}
+
+      {/* Edit Fee Modal */}
+      {editFeeStudent && (
+        <EditFeeModal
+          student={editFeeStudent}
+          onClose={() => setEditFeeStudent(null)}
+          onSaved={() => { setEditFeeStudent(null); loadData() }}
+        />
+      )}
     </div>
   )
 }
@@ -905,11 +900,12 @@ interface FeeCardProps {
   onMarkUnpaid: (s: StudentWithFee, ft: FeeType) => void
   onHistory: (rec: FeeRecord, s: StudentWithFee) => void
   onReceipt: (s: StudentWithFee, ft: FeeType) => void
+  onEditFee: (s: StudentWithFee) => void
 }
 
 function StudentFeeCard({
   student, periodMonth, periodYear, processingId, generatingPdf,
-  onPay, onMarkUnpaid, onHistory, onReceipt,
+  onPay, onMarkUnpaid, onHistory, onReceipt, onEditFee,
 }: FeeCardProps) {
   const hasSf = Number(student.fee_amount) > 0
   const hasEf = Number(student.exam_fee_amount) > 0
@@ -932,6 +928,13 @@ function StudentFeeCard({
             )}
           </div>
         </div>
+        <button
+          onClick={() => onEditFee(student)}
+          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0"
+          title="Edit fee amounts"
+        >
+          <PenLine size={13} />
+        </button>
       </div>
 
       {hasSf && (
@@ -1053,9 +1056,10 @@ interface GridCardProps {
   processingId: string | null
   onPay: (s: StudentWithFee, ft: FeeType, rec: FeeRecord | null) => void
   onMarkUnpaid: (s: StudentWithFee, ft: FeeType) => void
+  onEditFee: (s: StudentWithFee) => void
 }
 
-function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, onPay, onMarkUnpaid }: GridCardProps) {
+function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, onPay, onMarkUnpaid, onEditFee }: GridCardProps) {
   const sfStatus = student.school_fee_record?.status ?? 'unpaid'
   const efStatus = student.exam_fee_record?.status ?? 'unpaid'
   const sfOverdue = getDaysOverdue(student.school_fee_record, periodMonth, periodYear)
@@ -1066,10 +1070,17 @@ function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, on
         <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
           <span className="text-indigo-600 font-bold text-sm">{student.name.charAt(0).toUpperCase()}</span>
         </div>
-        <div className="min-w-0">
+        <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 text-sm truncate">{student.name}</p>
           <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{student.class}</span>
         </div>
+        <button
+          onClick={() => onEditFee(student)}
+          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0"
+          title="Edit fee amounts"
+        >
+          <PenLine size={13} />
+        </button>
       </div>
 
       {student.parent_phone && (

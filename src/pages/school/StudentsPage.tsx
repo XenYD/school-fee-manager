@@ -3,28 +3,21 @@ import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { GraduationCap, Plus, Trash2, X, Search, Phone } from 'lucide-react'
+import { GraduationCap, Plus, Trash2, X, Search, Phone, ListFilter } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
   const { profile } = useAuth()
   const [students, setStudents] = useState<Student[]>([])
-  const [filtered, setFiltered] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [selectedClass, setSelectedClass] = useState('')
   const [form, setForm] = useState({ name: '', class: '', fee_amount: '', parent_phone: '' })
 
   useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
-
-  useEffect(() => {
-    const q = search.toLowerCase()
-    setFiltered(
-      q ? students.filter((s) => s.name.toLowerCase().includes(q) || s.class.toLowerCase().includes(q)) : students
-    )
-  }, [search, students])
 
   async function loadStudents() {
     if (!profile?.school_id) return
@@ -36,7 +29,6 @@ export default function StudentsPage() {
         .order('name')
       if (error) throw error
       setStudents(data ?? [])
-      setFiltered(data ?? [])
     } catch {
       toast.error('Failed to load students')
     } finally {
@@ -86,10 +78,27 @@ export default function StudentsPage() {
     }
   }
 
+  // Derived data — no useEffect needed
+  const availableClasses = [...new Set(students.map((s) => s.class))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  )
+
+  const filtered = students.filter((s) => {
+    const q = search.toLowerCase().trim()
+    const matchesSearch = !q || s.name.toLowerCase().includes(q)
+    const matchesClass = !selectedClass || s.class === selectedClass
+    return matchesSearch && matchesClass
+  })
+
+  const totalMonthlyRevenue = students.reduce((sum, s) => sum + Number(s.fee_amount), 0)
+  const classRevenue = selectedClass
+    ? students.filter((s) => s.class === selectedClass).reduce((sum, s) => sum + Number(s.fee_amount), 0)
+    : null
+
   if (loading) return <LoadingSpinner fullPage text="Loading students..." />
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -103,17 +112,72 @@ export default function StudentsPage() {
         </button>
       </div>
 
-      {/* Search */}
+      {/* Filters row — only when there are students */}
       {students.length > 0 && (
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or class..."
-            className="input-field pl-9"
-          />
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={selectedClass ? `Search in ${selectedClass}...` : 'Search by name…'}
+              className="input-field pl-9"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Class filter */}
+          <div className="relative sm:w-56">
+            <ListFilter size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="input-field pl-9 appearance-none cursor-pointer"
+            >
+              <option value="">All Classes</option>
+              {availableClasses.map((cls) => {
+                const count = students.filter((s) => s.class === cls).length
+                return (
+                  <option key={cls} value={cls}>
+                    {cls} ({count} student{count !== 1 ? 's' : ''})
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Active filter chips */}
+      {(search || selectedClass) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-500">Filters:</span>
+          {selectedClass && (
+            <span className="inline-flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
+              Class: {selectedClass}
+              <button onClick={() => setSelectedClass('')} className="ml-0.5 hover:text-indigo-900">
+                <X size={11} />
+              </button>
+            </span>
+          )}
+          {search && (
+            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full font-medium">
+              "{search}"
+              <button onClick={() => setSearch('')} className="ml-0.5 hover:text-gray-900">
+                <X size={11} />
+              </button>
+            </span>
+          )}
+          <span className="text-xs text-gray-400 ml-1">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
         </div>
       )}
 
@@ -129,13 +193,31 @@ export default function StudentsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="card text-center py-8">
-          <p className="text-gray-500">No students match "{search}"</p>
+          <Search size={28} className="text-gray-300 mx-auto mb-2" />
+          <p className="text-gray-500 font-medium">No students found</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {selectedClass && search
+              ? `No students named "${search}" in ${selectedClass}`
+              : selectedClass
+              ? `No students in ${selectedClass}`
+              : `No students match "${search}"`}
+          </p>
+          <button
+            onClick={() => { setSearch(''); setSelectedClass('') }}
+            className="text-xs text-indigo-600 hover:underline mt-2"
+          >
+            Clear filters
+          </button>
         </div>
       ) : (
         <div className="card !p-0 overflow-hidden">
           <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 text-sm">Student List</h2>
-            <span className="text-xs text-gray-500">{filtered.length} shown</span>
+            <h2 className="font-semibold text-gray-900 text-sm">
+              {selectedClass ? `${selectedClass} Students` : 'All Students'}
+            </h2>
+            <span className="text-xs text-gray-500">
+              {filtered.length}{filtered.length !== students.length ? ` of ${students.length}` : ''} shown
+            </span>
           </div>
           <div className="table-container">
             <table className="data-table">
@@ -197,12 +279,14 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Stats Footer */}
+      {/* Revenue Footer */}
       {students.length > 0 && (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
-          <span className="text-sm text-indigo-700 font-medium">Total Monthly Revenue</span>
+          <span className="text-sm text-indigo-700 font-medium">
+            {selectedClass ? `${selectedClass} Monthly Revenue` : 'Total Monthly Revenue'}
+          </span>
           <span className="text-lg font-bold text-indigo-700">
-            {students.reduce((s, st) => s + Number(st.fee_amount), 0).toLocaleString()}
+            {(classRevenue ?? totalMonthlyRevenue).toLocaleString()}
           </span>
         </div>
       )}
@@ -227,7 +311,7 @@ export default function StudentsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Class *</label>
                   <input type="text" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })}
-                    placeholder="e.g. 5A" className="input-field" required />
+                    placeholder="e.g. Class 5" className="input-field" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Fee Amount *</label>

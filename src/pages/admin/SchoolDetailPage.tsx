@@ -1,13 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { School, Student, StudentWithFee } from '../../types'
+import { School, Student, StudentWithFee, PaymentMethod } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import PaymentMethodModal, { PAYMENT_METHOD_CONFIG } from '../../components/PaymentMethodModal'
 import { parseExcel, downloadExcelTemplate } from '../../utils/excel'
 import {
   ArrowLeft, Upload, CheckCircle2, XCircle, Plus, Trash2, X,
   FileSpreadsheet, GraduationCap, ChevronLeft, ChevronRight, Download,
-  ListFilter, CheckCheck
+  ListFilter, CheckCheck, Banknote, Smartphone,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -24,6 +25,8 @@ export default function SchoolDetailPage() {
   const [togglingFee, setTogglingFee] = useState<string | null>(null)
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [markingAllPaid, setMarkingAllPaid] = useState(false)
+  const [paymentStudent, setPaymentStudent] = useState<StudentWithFee | null>(null)
+  const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const now = new Date()
@@ -67,34 +70,56 @@ export default function SchoolDetailPage() {
     }
   }
 
-  async function toggleFee(student: StudentWithFee) {
+  function handleToggleFee(student: StudentWithFee) {
+    if (student.fee_record?.paid) {
+      markUnpaid(student)
+    } else {
+      setPaymentStudent(student)
+    }
+  }
+
+  async function markUnpaid(student: StudentWithFee) {
     setTogglingFee(student.id)
     try {
-      const isPaid = student.fee_record?.paid ?? false
-      if (isPaid && student.fee_record) {
+      if (student.fee_record) {
         const { error } = await supabase
           .from('fee_records')
-          .update({ paid: false, paid_date: null })
+          .update({ paid: false, paid_date: null, payment_method: null })
           .eq('id', student.fee_record.id)
         if (error) throw error
-      } else if (student.fee_record) {
+      }
+      toast.success('Marked as unpaid')
+      loadData()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update fee')
+    } finally {
+      setTogglingFee(null)
+    }
+  }
+
+  async function markPaid(student: StudentWithFee, method: PaymentMethod) {
+    setPaymentStudent(null)
+    setTogglingFee(student.id)
+    try {
+      const paidDate = new Date().toISOString()
+      if (student.fee_record) {
         const { error } = await supabase
           .from('fee_records')
-          .update({ paid: true, paid_date: new Date().toISOString() })
+          .update({ paid: true, paid_date: paidDate, payment_method: method })
           .eq('id', student.fee_record.id)
         if (error) throw error
       } else {
         const { error } = await supabase.from('fee_records').insert({
           student_id: student.id,
           school_id: id,
-          month,
-          year,
+          month, year,
           paid: true,
-          paid_date: new Date().toISOString(),
+          paid_date: paidDate,
+          payment_method: method,
         })
         if (error) throw error
       }
-      toast.success(isPaid ? 'Marked as unpaid' : 'Marked as paid')
+      toast.success(`Marked as paid · ${PAYMENT_METHOD_CONFIG[method].label}`)
       loadData()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to update fee')
@@ -182,44 +207,42 @@ export default function SchoolDetailPage() {
     setSelectedClass('')
   }
 
-  async function markAllPaid() {
+  function handleMarkAllPaid() {
     const unpaid = displayStudents.filter((s) => !s.fee_record?.paid)
     if (unpaid.length === 0) {
       toast('All students in this class are already paid!', { icon: '✓' })
       return
     }
-    if (!confirm(`Mark all ${unpaid.length} unpaid student${unpaid.length !== 1 ? 's' : ''} in "${selectedClass}" as paid for ${monthName}?`)) return
+    setBulkPaymentOpen(true)
+  }
 
+  async function executeBulkPaid(method: PaymentMethod) {
+    setBulkPaymentOpen(false)
+    const unpaid = displayStudents.filter((s) => !s.fee_record?.paid)
     setMarkingAllPaid(true)
     try {
-      const now = new Date().toISOString()
-
+      const paidDate = new Date().toISOString()
       const toUpdate = unpaid.filter((s) => s.fee_record !== null)
       const toInsert = unpaid.filter((s) => s.fee_record === null)
 
       if (toUpdate.length > 0) {
         const { error } = await supabase
           .from('fee_records')
-          .update({ paid: true, paid_date: now })
+          .update({ paid: true, paid_date: paidDate, payment_method: method })
           .in('id', toUpdate.map((s) => s.fee_record!.id))
         if (error) throw error
       }
-
       if (toInsert.length > 0) {
         const { error } = await supabase.from('fee_records').insert(
           toInsert.map((s) => ({
-            student_id: s.id,
-            school_id: id,
-            month,
-            year,
-            paid: true,
-            paid_date: now,
+            student_id: s.id, school_id: id,
+            month, year, paid: true, paid_date: paidDate, payment_method: method,
           }))
         )
         if (error) throw error
       }
 
-      toast.success(`${unpaid.length} student${unpaid.length !== 1 ? 's' : ''} marked as paid!`)
+      toast.success(`${unpaid.length} student${unpaid.length !== 1 ? 's' : ''} marked as paid · ${PAYMENT_METHOD_CONFIG[method].label}`)
       loadData()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Bulk update failed')
@@ -328,7 +351,7 @@ export default function SchoolDetailPage() {
           </div>
           {selectedClass && (
             <button
-              onClick={markAllPaid}
+              onClick={handleMarkAllPaid}
               disabled={markingAllPaid || allClassPaid}
               className={`btn-success text-sm flex-shrink-0 ${allClassPaid ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
@@ -397,20 +420,33 @@ export default function SchoolDetailPage() {
                       </td>
                       <td className="font-medium text-sm">{Number(student.fee_amount).toLocaleString()}</td>
                       <td>
-                        {paid ? (
-                          <span className="badge-paid">
-                            <CheckCircle2 size={11} /> Paid
-                          </span>
-                        ) : (
-                          <span className="badge-unpaid">
-                            <XCircle size={11} /> Unpaid
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {paid ? (
+                            <span className="badge-paid">
+                              <CheckCircle2 size={11} /> Paid
+                            </span>
+                          ) : (
+                            <span className="badge-unpaid">
+                              <XCircle size={11} /> Unpaid
+                            </span>
+                          )}
+                          {paid && student.fee_record?.payment_method && (
+                            <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium w-fit ${
+                              student.fee_record.payment_method === 'cash'
+                                ? 'bg-green-50 text-green-700'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}>
+                              {student.fee_record.payment_method === 'cash'
+                                ? <><Banknote size={10} /> Cash</>
+                                : <><Smartphone size={10} /> Online</>}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => toggleFee(student)}
+                            onClick={() => handleToggleFee(student)}
                             disabled={togglingFee === student.id}
                             className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
                               paid
@@ -527,6 +563,26 @@ export default function SchoolDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Single student payment modal */}
+      {paymentStudent && (
+        <PaymentMethodModal
+          studentName={paymentStudent.name}
+          feeAmount={Number(paymentStudent.fee_amount)}
+          onConfirm={(method) => markPaid(paymentStudent, method)}
+          onCancel={() => setPaymentStudent(null)}
+        />
+      )}
+
+      {/* Bulk payment modal */}
+      {bulkPaymentOpen && (
+        <PaymentMethodModal
+          isBulk
+          bulkCount={displayStudents.filter((s) => !s.fee_record?.paid).length}
+          onConfirm={executeBulkPaid}
+          onCancel={() => setBulkPaymentOpen(false)}
+        />
       )}
     </div>
   )

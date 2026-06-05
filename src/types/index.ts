@@ -32,6 +32,8 @@ export interface Student {
   schools?: School
 }
 
+export type PaymentMethod = 'cash' | 'online'
+
 export interface FeeRecord {
   id: string
   student_id: string
@@ -41,6 +43,7 @@ export interface FeeRecord {
   paid: boolean
   paid_date: string | null
   paid_by: string | null
+  payment_method: PaymentMethod | null
   created_at: string
   updated_at: string
 }

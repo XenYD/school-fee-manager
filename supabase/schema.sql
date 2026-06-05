@@ -3,6 +3,14 @@
 -- Run this in your Supabase SQL Editor (supabase.com/dashboard)
 -- ============================================================
 
+-- ============================================================
+-- MIGRATION (run this if you already have an existing database)
+-- Adds the payment_method column to fee_records
+-- ============================================================
+-- ALTER TABLE public.fee_records
+--   ADD COLUMN IF NOT EXISTS payment_method TEXT CHECK (payment_method IN ('cash', 'online'));
+-- ============================================================
+
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -53,7 +61,8 @@ CREATE TABLE IF NOT EXISTS public.fee_records (
   year        INTEGER NOT NULL CHECK (year >= 2000),
   paid        BOOLEAN NOT NULL DEFAULT FALSE,
   paid_date   TIMESTAMPTZ,
-  paid_by     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  paid_by         UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+ payment_method  TEXT CHECK (payment_method IN ('cash', 'online')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (student_id, month, year)

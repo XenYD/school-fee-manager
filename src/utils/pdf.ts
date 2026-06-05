@@ -67,11 +67,15 @@ export async function generateReceipt({ student, schoolName, month, year }: Rece
   doc.setDrawColor(229, 231, 235)
   doc.line(15, 47, pageW - 15, 47)
 
-  const details = [
+  const paymentMethod = student.fee_record?.payment_method
+  const paymentMethodLabel = paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'online' ? 'Online Transfer' : '—'
+
+  const details: [string, string][] = [
     ['Student Name', student.name],
     ['Class', student.class],
     ['Parent Phone', student.parent_phone ?? '—'],
     ['Month', `${monthName} ${year}`],
+    ['Payment Method', paymentMethodLabel],
   ]
 
   doc.setFont('helvetica', 'normal')
@@ -195,6 +199,9 @@ export async function generateSummaryReport({ students, schoolName, month, year 
     s.class,
     Number(s.fee_amount).toLocaleString(),
     s.fee_record?.paid ? 'PAID' : 'UNPAID',
+    s.fee_record?.payment_method
+      ? s.fee_record.payment_method === 'cash' ? 'Cash' : 'Online'
+      : '—',
     s.fee_record?.paid_date
       ? new Date(s.fee_record.paid_date).toLocaleDateString()
       : '—',
@@ -202,18 +209,19 @@ export async function generateSummaryReport({ students, schoolName, month, year 
 
   autoTable(doc, {
     startY: afterSummary + 5,
-    head: [['#', 'Student Name', 'Class', 'Fee', 'Status', 'Payment Date']],
+    head: [['#', 'Student Name', 'Class', 'Fee', 'Status', 'Method', 'Payment Date']],
     body: tableRows,
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
     bodyStyles: { textColor: [51, 51, 51] },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 55 },
-      2: { cellWidth: 20, halign: 'center' },
-      3: { cellWidth: 25, halign: 'right' },
-      4: { cellWidth: 25, halign: 'center' },
-      5: { cellWidth: 35 },
+      1: { cellWidth: 50 },
+      2: { cellWidth: 18, halign: 'center' },
+      3: { cellWidth: 22, halign: 'right' },
+      4: { cellWidth: 22, halign: 'center' },
+      5: { cellWidth: 20, halign: 'center' },
+      6: { cellWidth: 28 },
     },
     didParseCell: (data) => {
       if (data.column.index === 4 && data.section === 'body') {

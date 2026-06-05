@@ -252,38 +252,48 @@ export default function SchoolDetailPage() {
     }
   }
 
-  async function executeBulkPaid(method: PaymentMethod) {
+  async function executeBulkPaid(method: PaymentMethod, feeTypes: FeeType[] = ['school_fee']) {
     setBulkPaymentOpen(false)
-    const targets = classFilteredStudents.filter(
-      (s) => (s.school_fee_record?.status ?? 'unpaid') !== 'paid' && Number(s.fee_amount) > 0
-    )
-    if (targets.length === 0) return
     setMarkingAllPaid(true)
+    let totalProcessed = 0
     try {
-      for (const student of targets) {
-        const record = student.school_fee_record
-        const due = record?.due_amount ?? Number(student.fee_amount)
-        const paid = record?.paid_amount ?? 0
-        const payAmt = due - paid
-        if (payAmt <= 0) continue
-        let recordId = record?.id
-        if (!record) {
-          const { data: nr, error } = await supabase.from('fee_records').insert({
-            student_id: student.id, school_id: schoolId,
-            month: periodMonth, year: periodYear, fee_type: 'school_fee',
-            due_amount: due, paid_amount: 0, status: 'unpaid',
-            due_date: getPeriodDueDate(periodMonth, periodYear), paid_by: profile?.id,
-          }).select().single()
-          if (error) throw error
-          recordId = nr.id
+      for (const feeType of feeTypes) {
+        const feeAmountKey = feeType === 'school_fee' ? 'fee_amount' : 'exam_fee_amount'
+        const recordKey = feeType === 'school_fee' ? 'school_fee_record' : 'exam_fee_record'
+        const targets = classFilteredStudents.filter(
+          (s) => (s[recordKey]?.status ?? 'unpaid') !== 'paid' && Number(s[feeAmountKey]) > 0
+        )
+        for (const student of targets) {
+          const record = student[recordKey]
+          const due = record?.due_amount ?? Number(student[feeAmountKey])
+          const paid = record?.paid_amount ?? 0
+          const payAmt = due - paid
+          if (payAmt <= 0) continue
+          let recordId = record?.id
+          if (!record) {
+            const { data: nr, error } = await supabase.from('fee_records').insert({
+              student_id: student.id, school_id: schoolId,
+              month: periodMonth, year: periodYear, fee_type: feeType,
+              due_amount: due, paid_amount: 0, status: 'unpaid',
+              due_date: getPeriodDueDate(periodMonth, periodYear), paid_by: profile?.id,
+            }).select().single()
+            if (error) throw error
+            recordId = nr.id
+          }
+          await supabase.from('payment_transactions').insert({
+            fee_record_id: recordId, student_id: student.id, school_id: schoolId,
+            amount: payAmt, payment_method: method, paid_by: profile?.id,
+          })
+          await supabase.from('fee_records').update({ paid_amount: due, status: 'paid', paid_by: profile?.id }).eq('id', recordId)
+          totalProcessed++
         }
-        await supabase.from('payment_transactions').insert({
-          fee_record_id: recordId, student_id: student.id, school_id: schoolId,
-          amount: payAmt, payment_method: method, paid_by: profile?.id,
-        })
-        await supabase.from('fee_records').update({ paid_amount: due, status: 'paid', paid_by: profile?.id }).eq('id', recordId)
       }
-      toast.success(`${targets.length} students marked paid`)
+      if (totalProcessed === 0) {
+        toast('No unpaid fees found for selection')
+      } else {
+        const typeLabel = feeTypes.length === 2 ? 'school + exam fees' : feeTypes[0] === 'school_fee' ? 'school fees' : 'exam fees'
+        toast.success(`${totalProcessed} record${totalProcessed !== 1 ? 's' : ''} marked paid (${typeLabel}) · ${method === 'cash' ? 'Cash' : 'Online'}`)
+      }
       loadData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Bulk payment failed')
@@ -366,9 +376,13 @@ export default function SchoolDetailPage() {
   const totalCollected = students.reduce((s, st) => s + Number(st.school_fee_record?.paid_amount ?? 0) + Number(st.exam_fee_record?.paid_amount ?? 0), 0)
   const totalPending = totalExpected - totalCollected
   const collectionPct = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0
-  const unpaidForClass = selectedClass
+  const unpaidSchoolFeeCount = selectedClass
     ? classFilteredStudents.filter((s) => (s.school_fee_record?.status ?? 'unpaid') !== 'paid' && Number(s.fee_amount) > 0).length
     : 0
+  const unpaidExamFeeCount = selectedClass
+    ? classFilteredStudents.filter((s) => (s.exam_fee_record?.status ?? 'unpaid') !== 'paid' && Number(s.exam_fee_amount) > 0).length
+    : 0
+  const unpaidForClass = unpaidSchoolFeeCount + unpaidExamFeeCount
 
   const resetType = school?.fee_reset_type ?? 'monthly'
   const periodStr = getPeriodLabel(periodMonth, periodYear, resetType)
@@ -787,8 +801,12 @@ export default function SchoolDetailPage() {
       )}
 
       {bulkPaymentOpen && (
-        <PaymentModal isBulk bulkCount={unpaidForClass}
-          onConfirm={(_, method) => executeBulkPaid(method)}
+        <PaymentModal
+          isBulk
+          bulkCount={unpaidForClass}
+          bulkSchoolFeeCount={unpaidSchoolFeeCount}
+          bulkExamFeeCount={unpaidExamFeeCount}
+          onConfirm={(_, method, feeTypes) => executeBulkPaid(method, feeTypes ?? ['school_fee'])}
           onCancel={() => setBulkPaymentOpen(false)}
         />
       )}

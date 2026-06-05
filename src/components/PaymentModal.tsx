@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Banknote, Smartphone, X, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Banknote, Smartphone, X, AlertCircle, CheckCircle2, GraduationCap, BookOpen } from 'lucide-react'
 import type { PaymentMethod, FeeType } from '../types'
 import { FEE_TYPE_LABELS } from '../types'
 
@@ -10,7 +10,10 @@ interface Props {
   paidSoFar?: number
   isBulk?: boolean
   bulkCount?: number
-  onConfirm: (amount: number, method: PaymentMethod) => void
+  /** counts for bulk mode checkboxes */
+  bulkSchoolFeeCount?: number
+  bulkExamFeeCount?: number
+  onConfirm: (amount: number, method: PaymentMethod, feeTypes?: FeeType[]) => void
   onCancel: () => void
 }
 
@@ -21,20 +24,32 @@ export default function PaymentModal({
   paidSoFar = 0,
   isBulk = false,
   bulkCount = 0,
+  bulkSchoolFeeCount = 0,
+  bulkExamFeeCount = 0,
   onConfirm,
   onCancel,
 }: Props) {
   const remaining = dueAmount - paidSoFar
   const [amount, setAmount] = useState<string>(isBulk ? '' : String(remaining))
   const [method, setMethod] = useState<PaymentMethod | null>(null)
+  const [includeSchoolFee, setIncludeSchoolFee] = useState(true)
+  const [includeExamFee, setIncludeExamFee] = useState(bulkExamFeeCount > 0)
 
   const numAmount = parseFloat(amount) || 0
   const isPartial = !isBulk && numAmount > 0 && numAmount < remaining
-  const isValid = method !== null && (isBulk ? true : numAmount > 0 && numAmount <= remaining)
+  const atLeastOneFeeType = !isBulk || includeSchoolFee || includeExamFee
+  const isValid = method !== null && atLeastOneFeeType && (isBulk ? true : numAmount > 0 && numAmount <= remaining)
 
   function handleConfirm() {
     if (!isValid || !method) return
-    onConfirm(isBulk ? 0 : numAmount, method)
+    if (isBulk) {
+      const types: FeeType[] = []
+      if (includeSchoolFee) types.push('school_fee')
+      if (includeExamFee) types.push('exam_fee')
+      onConfirm(0, method, types)
+    } else {
+      onConfirm(numAmount, method)
+    }
   }
 
   const feeLabel = feeType ? FEE_TYPE_LABELS[feeType] : ''
@@ -130,6 +145,55 @@ export default function PaymentModal({
                   <AlertCircle size={11} />
                   Amount exceeds remaining balance
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Fee type selection (bulk only) */}
+          {isBulk && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Fee Types to Mark Paid *
+              </p>
+              <div className="space-y-2">
+                <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${includeSchoolFee ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white'}`}>
+                  <input
+                    type="checkbox"
+                    checked={includeSchoolFee}
+                    onChange={(e) => setIncludeSchoolFee(e.target.checked)}
+                    className="w-4 h-4 accent-indigo-600"
+                    disabled={bulkSchoolFeeCount === 0}
+                  />
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${includeSchoolFee ? 'bg-indigo-100' : 'bg-gray-100'}`}>
+                    <GraduationCap size={14} className={includeSchoolFee ? 'text-indigo-600' : 'text-gray-400'} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${includeSchoolFee ? 'text-indigo-700' : 'text-gray-500'}`}>School Fee</p>
+                    <p className="text-xs text-gray-400">{bulkSchoolFeeCount} student{bulkSchoolFeeCount !== 1 ? 's' : ''} unpaid/partial</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${includeExamFee ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'} ${bulkExamFeeCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={includeExamFee}
+                    onChange={(e) => setIncludeExamFee(e.target.checked)}
+                    className="w-4 h-4 accent-purple-600"
+                    disabled={bulkExamFeeCount === 0}
+                  />
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${includeExamFee ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                    <BookOpen size={14} className={includeExamFee ? 'text-purple-600' : 'text-gray-400'} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${includeExamFee ? 'text-purple-700' : 'text-gray-500'}`}>Exam Fee</p>
+                    <p className="text-xs text-gray-400">
+                      {bulkExamFeeCount > 0 ? `${bulkExamFeeCount} student${bulkExamFeeCount !== 1 ? 's' : ''} unpaid/partial` : 'No unpaid exam fees'}
+                    </p>
+                  </div>
+                </label>
+              </div>
+              {!atLeastOneFeeType && (
+                <p className="text-xs text-red-500 mt-2">Select at least one fee type</p>
               )}
             </div>
           )}

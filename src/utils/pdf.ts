@@ -1,257 +1,374 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { StudentWithFee } from '../types'
+import type { FeeType, PaymentMethod, FeeStatus } from '../types'
+import { FEE_TYPE_LABELS, getPeriodLabel } from '../types'
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
+// ─── Receipt ────────────────────────────────────────────────────────────────
 
-interface ReceiptOptions {
-  student: StudentWithFee
+export interface ReceiptOptions {
   schoolName: string
+  studentName: string
+  studentClass: string
+  parentPhone?: string | null
+  feeType: FeeType
+  dueAmount: number
+  amountPaid: number
+  totalPaidSoFar: number
+  remaining: number
+  paymentMethod: PaymentMethod
   month: number
   year: number
+  periodLabel?: string
+  resetType?: 'monthly' | 'term'
 }
 
-interface SummaryOptions {
-  students: StudentWithFee[]
-  schoolName: string
-  month: number
-  year: number
-}
-
-export async function generateReceipt({ student, schoolName, month, year }: ReceiptOptions) {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
-
+export function generateReceipt(opts: ReceiptOptions): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a5' })
   const pageW = doc.internal.pageSize.getWidth()
-  const monthName = MONTHS[month - 1]
-  const receiptNo = `REC-${year}${String(month).padStart(2, '0')}-${student.id.slice(0, 6).toUpperCase()}`
+  const margin = 15
+
+  const receiptNo = `RCT-${Date.now().toString(36).toUpperCase()}`
+  const dateStr = new Date().toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+  const periodStr = opts.periodLabel ?? getPeriodLabel(opts.month, opts.year, opts.resetType ?? 'monthly')
 
   // Header background
   doc.setFillColor(79, 70, 229)
-  doc.rect(0, 0, pageW, 35, 'F')
+  doc.rect(0, 0, pageW, 28, 'F')
 
-  // School Name
   doc.setTextColor(255, 255, 255)
-  doc.setFontSize(16)
+  doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
-  doc.text(schoolName, pageW / 2, 14, { align: 'center' })
-
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.text('FEE PAYMENT RECEIPT', pageW / 2, 22, { align: 'center' })
-
+  doc.text(opts.schoolName, pageW / 2, 11, { align: 'center' })
   doc.setFontSize(8)
-  doc.text(`Receipt No: ${receiptNo}`, pageW / 2, 29, { align: 'center' })
-
-  // PAID Stamp
-  if (student.fee_record?.paid) {
-    doc.setFillColor(34, 197, 94, 0.15)
-    doc.setDrawColor(34, 197, 94)
-    doc.setLineWidth(0.8)
-    doc.roundedRect(pageW - 48, 37, 40, 14, 3, 3, 'FD')
-    doc.setTextColor(22, 163, 74)
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('✓ PAID', pageW - 28, 46, { align: 'center' })
-  }
-
-  // Student Details
-  doc.setTextColor(30, 30, 30)
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Student Details', 15, 45)
-
-  doc.setLineWidth(0.3)
-  doc.setDrawColor(229, 231, 235)
-  doc.line(15, 47, pageW - 15, 47)
-
-  const paymentMethod = student.fee_record?.payment_method
-  const paymentMethodLabel = paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'online' ? 'Online Transfer' : '—'
-
-  const details: [string, string][] = [
-    ['Student Name', student.name],
-    ['Class', student.class],
-    ['Parent Phone', student.parent_phone ?? '—'],
-    ['Month', `${monthName} ${year}`],
-    ['Payment Method', paymentMethodLabel],
-  ]
-
   doc.setFont('helvetica', 'normal')
+  doc.text('FEE PAYMENT RECEIPT', pageW / 2, 18, { align: 'center' })
+  doc.text(`Receipt No: ${receiptNo}`, pageW / 2, 24, { align: 'center' })
+
+  doc.setTextColor(30, 30, 30)
+  let y = 36
+
+  // Student info
+  doc.setFillColor(245, 247, 255)
+  doc.roundedRect(margin, y, pageW - margin * 2, 22, 3, 3, 'F')
   doc.setFontSize(9)
-  let y = 53
-  details.forEach(([label, value]) => {
-    doc.setTextColor(107, 114, 128)
-    doc.text(label, 15, y)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Student', margin + 4, y + 6)
+  doc.setFont('helvetica', 'normal')
+  doc.text(opts.studentName, margin + 4, y + 12)
+  doc.text(opts.studentClass, margin + 4, y + 18)
+  if (opts.parentPhone) {
+    doc.setTextColor(99, 102, 241)
+    doc.text(`Parent: ${opts.parentPhone}`, pageW / 2, y + 12)
     doc.setTextColor(30, 30, 30)
-    doc.setFont('helvetica', 'bold')
-    doc.text(value, 70, y)
-    doc.setFont('helvetica', 'normal')
-    y += 8
+  }
+  doc.text(`Period: ${periodStr}`, pageW / 2, y + 18)
+  doc.text(`Date: ${dateStr}`, pageW - margin - 4, y + 12, { align: 'right' })
+
+  y += 28
+
+  // Fee details table
+  const isPartial = opts.remaining > 0
+  const methodLabel = opts.paymentMethod === 'cash' ? 'Cash' : 'Online Transfer'
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [['Description', 'Amount']],
+    body: [
+      [`${FEE_TYPE_LABELS[opts.feeType]} — ${periodStr}`, `Rs ${opts.dueAmount.toLocaleString()}`],
+      ['Paid This Transaction', `Rs ${opts.amountPaid.toLocaleString()}`],
+      opts.totalPaidSoFar !== opts.amountPaid
+        ? ['Total Paid So Far', `Rs ${opts.totalPaidSoFar.toLocaleString()}`]
+        : null,
+      isPartial ? ['Remaining Balance', `Rs ${opts.remaining.toLocaleString()}`] : null,
+      ['Payment Method', methodLabel],
+    ].filter(Boolean) as string[][],
+    theme: 'striped',
+    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+    bodyStyles: { fontSize: 9 },
+    columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right', fontStyle: 'bold' } },
   })
 
-  // Amount Box
-  doc.setFillColor(243, 244, 246)
-  doc.roundedRect(15, y + 2, pageW - 30, 22, 3, 3, 'F')
-  doc.setFontSize(10)
-  doc.setTextColor(107, 114, 128)
-  doc.setFont('helvetica', 'normal')
-  doc.text('Amount Paid', pageW / 2, y + 11, { align: 'center' })
-  doc.setFontSize(20)
+  const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
+
+  // Status banner
+  const bannerColor = isPartial ? [251, 191, 36] : [34, 197, 94]
+  doc.setFillColor(bannerColor[0], bannerColor[1], bannerColor[2])
+  doc.rect(margin, finalY, pageW - margin * 2, 9, 'F')
+  doc.setTextColor(isPartial ? 120 : 255, isPartial ? 50 : 255, isPartial ? 0 : 255)
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(79, 70, 229)
-  doc.text(Number(student.fee_amount).toLocaleString(), pageW / 2, y + 21, { align: 'center' })
+  doc.setTextColor(255, 255, 255)
+  doc.text(
+    isPartial ? `⚠ Partial Payment — Rs ${opts.remaining.toLocaleString()} remaining` : '✓ Fully Paid',
+    pageW / 2,
+    finalY + 5.5,
+    { align: 'center' }
+  )
 
-  y += 32
-
-  // Payment Date
-  if (student.fee_record?.paid_date) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(107, 114, 128)
-    const paidDate = new Date(student.fee_record.paid_date).toLocaleDateString('en-US', {
-      day: '2-digit', month: 'long', year: 'numeric'
-    })
-    doc.text(`Payment Date: ${paidDate}`, pageW / 2, y, { align: 'center' })
-    y += 7
-  }
-
-  // Footer
-  doc.setFontSize(8)
-  doc.setTextColor(156, 163, 175)
+  doc.setTextColor(150, 150, 150)
+  doc.setFontSize(7)
   doc.setFont('helvetica', 'italic')
-  doc.text('This is a computer-generated receipt. No signature required.', pageW / 2, y + 5, { align: 'center' })
-  doc.text(`Generated on ${new Date().toLocaleDateString()}`, pageW / 2, y + 11, { align: 'center' })
+  doc.text('This is a computer-generated receipt.', pageW / 2, finalY + 16, { align: 'center' })
 
-  doc.save(`Receipt_${student.name.replace(/\s+/g, '_')}_${monthName}_${year}.pdf`)
+  const filename = `Receipt_${opts.studentName.replace(/\s+/g, '_')}_${opts.month}-${opts.year}.pdf`
+  doc.save(filename)
 }
 
-export async function generateSummaryReport({ students, schoolName, month, year }: SummaryOptions) {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+// ─── Defaulters Report ───────────────────────────────────────────────────────
 
+export interface DefaulterEntry {
+  name: string
+  studentClass: string
+  feeType: FeeType
+  dueAmount: number
+  paidAmount: number
+  remaining: number
+  daysOverdue: number
+  parentPhone?: string | null
+  status: FeeStatus
+}
+
+export interface DefaultersReportOptions {
+  defaulters: DefaulterEntry[]
+  schoolName: string
+  month: number
+  year: number
+  periodLabel: string
+}
+
+export function generateDefaultersReport(opts: DefaultersReportOptions): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
   const pageW = doc.internal.pageSize.getWidth()
-  const monthName = MONTHS[month - 1]
-  const paid = students.filter((s) => s.fee_record?.paid)
-  const unpaid = students.filter((s) => !s.fee_record?.paid)
-  const totalExpected = students.reduce((s, st) => s + Number(st.fee_amount), 0)
-  const totalCollected = paid.reduce((s, st) => s + Number(st.fee_amount), 0)
-  const totalPending = totalExpected - totalCollected
+  const margin = 14
+
+  // Header
+  doc.setFillColor(220, 38, 38)
+  doc.rect(0, 0, pageW, 22, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`${opts.schoolName} — Defaulters Report`, pageW / 2, 10, { align: 'center' })
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text(
+    `Period: ${opts.periodLabel}  |  Generated: ${new Date().toLocaleDateString('en-GB')}  |  ${opts.defaulters.length} defaulter(s)`,
+    pageW / 2,
+    17,
+    { align: 'center' }
+  )
+
+  doc.setTextColor(30, 30, 30)
+
+  autoTable(doc, {
+    startY: 28,
+    margin: { left: margin, right: margin },
+    head: [
+      ['#', 'Student Name', 'Class', 'Fee Type', 'Due (Rs)', 'Paid (Rs)', 'Remaining (Rs)', 'Days Overdue', 'Status', 'Parent Phone'],
+    ],
+    body: opts.defaulters.map((d, i) => [
+      i + 1,
+      d.name,
+      d.studentClass,
+      FEE_TYPE_LABELS[d.feeType],
+      d.dueAmount.toLocaleString(),
+      d.paidAmount.toLocaleString(),
+      d.remaining.toLocaleString(),
+      d.daysOverdue > 0 ? `${d.daysOverdue}d` : '—',
+      d.status.charAt(0).toUpperCase() + d.status.slice(1),
+      d.parentPhone ?? '—',
+    ]),
+    theme: 'striped',
+    headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      4: { halign: 'right' },
+      5: { halign: 'right' },
+      6: { halign: 'right', fontStyle: 'bold' },
+      7: { halign: 'center' },
+      8: { halign: 'center' },
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index === 7) {
+        const val = String(data.cell.raw)
+        if (val !== '—') data.cell.styles.textColor = [220, 38, 38]
+      }
+      if (data.section === 'body' && data.column.index === 8) {
+        const val = String(data.cell.raw).toLowerCase()
+        if (val === 'unpaid') data.cell.styles.textColor = [220, 38, 38]
+        if (val === 'partial') data.cell.styles.textColor = [180, 90, 0]
+      }
+    },
+  })
+
+  const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+
+  // Summary row
+  const totalDue = opts.defaulters.reduce((s, d) => s + d.dueAmount, 0)
+  const totalPaid = opts.defaulters.reduce((s, d) => s + d.paidAmount, 0)
+  const totalRemaining = opts.defaulters.reduce((s, d) => s + d.remaining, 0)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(220, 38, 38)
+  doc.text(
+    `Total Pending: Rs ${totalRemaining.toLocaleString()}   |   Total Due: Rs ${totalDue.toLocaleString()}   |   Total Partial Paid: Rs ${totalPaid.toLocaleString()}`,
+    pageW / 2,
+    finalY,
+    { align: 'center' }
+  )
+
+  const filename = `Defaulters_${opts.schoolName.replace(/\s+/g, '_')}_${opts.month}-${opts.year}.pdf`
+  doc.save(filename)
+}
+
+// ─── Monthly Summary Report ─────────────────────────────────────────────────
+
+export interface ClassSummaryRow {
+  className: string
+  students: number
+  schoolFeeExpected: number
+  schoolFeeCollected: number
+  examFeeExpected: number
+  examFeeCollected: number
+}
+
+export interface SummaryReportOptions {
+  schoolName: string
+  month: number
+  year: number
+  periodLabel: string
+  totalStudents: number
+  totalExpected: number
+  totalCollected: number
+  totalPending: number
+  classSummary: ClassSummaryRow[]
+}
+
+export function generateSummaryReport(opts: SummaryReportOptions): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const margin = 14
 
   // Header
   doc.setFillColor(79, 70, 229)
-  doc.rect(0, 0, pageW, 38, 'F')
-
+  doc.rect(0, 0, pageW, 22, 'F')
   doc.setTextColor(255, 255, 255)
-  doc.setFontSize(18)
+  doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
-  doc.text(schoolName, pageW / 2, 15, { align: 'center' })
-
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'normal')
-  doc.text('Monthly Fee Collection Report', pageW / 2, 24, { align: 'center' })
-
+  doc.text(`${opts.schoolName} — Monthly Summary Report`, pageW / 2, 10, { align: 'center' })
   doc.setFontSize(9)
-  doc.text(`${monthName} ${year}`, pageW / 2, 32, { align: 'center' })
+  doc.setFont('helvetica', 'normal')
+  doc.text(
+    `Period: ${opts.periodLabel}  |  Generated: ${new Date().toLocaleDateString('en-GB')}`,
+    pageW / 2,
+    17,
+    { align: 'center' }
+  )
 
-  // Summary Stats
-  let y = 50
   doc.setTextColor(30, 30, 30)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Summary', 15, y)
-  y += 5
+  let y = 28
 
-  const summaryRows = [
-    ['Total Students', students.length.toString(), ''],
-    ['Total Expected', totalExpected.toLocaleString(), ''],
-    ['Total Collected', totalCollected.toLocaleString(), `${Math.round((totalCollected / totalExpected) * 100) || 0}%`],
-    ['Total Pending', totalPending.toLocaleString(), `${Math.round((totalPending / totalExpected) * 100) || 0}%`],
-    ['Students Paid', paid.length.toString(), ''],
-    ['Students Unpaid', unpaid.length.toString(), ''],
+  // Overall stats
+  doc.setFillColor(245, 247, 255)
+  doc.roundedRect(margin, y, pageW - margin * 2, 18, 3, 3, 'F')
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  const stats = [
+    { label: 'Total Students', value: String(opts.totalStudents) },
+    { label: 'Total Expected', value: `Rs ${opts.totalExpected.toLocaleString()}` },
+    { label: 'Total Collected', value: `Rs ${opts.totalCollected.toLocaleString()}` },
+    { label: 'Total Pending', value: `Rs ${opts.totalPending.toLocaleString()}` },
+    {
+      label: 'Collection %',
+      value:
+        opts.totalExpected > 0
+          ? `${Math.round((opts.totalCollected / opts.totalExpected) * 100)}%`
+          : '0%',
+    },
   ]
-
-  autoTable(doc, {
-    startY: y + 2,
-    head: [['Metric', 'Value', 'Percentage']],
-    body: summaryRows,
-    styles: { fontSize: 9, cellPadding: 3 },
-    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 60 },
-      1: { cellWidth: 50 },
-      2: { cellWidth: 40 },
-    },
-    margin: { left: 15, right: 15 },
+  const colWidth = (pageW - margin * 2) / stats.length
+  stats.forEach((stat, i) => {
+    const x = margin + i * colWidth + colWidth / 2
+    doc.setTextColor(99, 102, 241)
+    doc.setFontSize(11)
+    doc.text(stat.value, x, y + 8, { align: 'center' })
+    doc.setFontSize(7)
+    doc.setTextColor(120, 120, 120)
+    doc.text(stat.label, x, y + 14, { align: 'center' })
   })
 
-  const afterSummary = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+  y += 24
 
-  // Detailed Table
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
+  // Class breakdown
   doc.setTextColor(30, 30, 30)
-  doc.text('Student Details', 15, afterSummary)
-
-  const tableRows = students.map((s, idx) => [
-    (idx + 1).toString(),
-    s.name,
-    s.class,
-    Number(s.fee_amount).toLocaleString(),
-    s.fee_record?.paid ? 'PAID' : 'UNPAID',
-    s.fee_record?.payment_method
-      ? s.fee_record.payment_method === 'cash' ? 'Cash' : 'Online'
-      : '—',
-    s.fee_record?.paid_date
-      ? new Date(s.fee_record.paid_date).toLocaleDateString()
-      : '—',
-  ])
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Class-wise Breakdown', margin, y)
+  y += 4
 
   autoTable(doc, {
-    startY: afterSummary + 5,
-    head: [['#', 'Student Name', 'Class', 'Fee', 'Status', 'Method', 'Payment Date']],
-    body: tableRows,
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-    bodyStyles: { textColor: [51, 51, 51] },
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [
+      [
+        'Class', 'Students',
+        'School Fee Expected', 'School Fee Collected', 'School Fee Pending', 'SF %',
+        'Exam Fee Expected', 'Exam Fee Collected', 'Exam Fee Pending',
+      ],
+    ],
+    body: opts.classSummary.map((row) => {
+      const sfPending = row.schoolFeeExpected - row.schoolFeeCollected
+      const sfPct = row.schoolFeeExpected > 0
+        ? `${Math.round((row.schoolFeeCollected / row.schoolFeeExpected) * 100)}%`
+        : '—'
+      const efPending = row.examFeeExpected - row.examFeeCollected
+      return [
+        row.className,
+        row.students,
+        row.schoolFeeExpected.toLocaleString(),
+        row.schoolFeeCollected.toLocaleString(),
+        sfPending.toLocaleString(),
+        sfPct,
+        row.examFeeExpected > 0 ? row.examFeeExpected.toLocaleString() : '—',
+        row.examFeeCollected > 0 ? row.examFeeCollected.toLocaleString() : '—',
+        row.examFeeExpected > 0 ? efPending.toLocaleString() : '—',
+      ]
+    }),
+    foot: [
+      [
+        'TOTAL',
+        opts.totalStudents,
+        opts.classSummary.reduce((s, r) => s + r.schoolFeeExpected, 0).toLocaleString(),
+        opts.classSummary.reduce((s, r) => s + r.schoolFeeCollected, 0).toLocaleString(),
+        opts.classSummary.reduce((s, r) => s + (r.schoolFeeExpected - r.schoolFeeCollected), 0).toLocaleString(),
+        '',
+        opts.classSummary.reduce((s, r) => s + r.examFeeExpected, 0).toLocaleString(),
+        opts.classSummary.reduce((s, r) => s + r.examFeeCollected, 0).toLocaleString(),
+        opts.classSummary.reduce((s, r) => s + (r.examFeeExpected - r.examFeeCollected), 0).toLocaleString(),
+      ],
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 8 },
+    footStyles: { fillColor: [230, 234, 255], textColor: [30, 30, 100], fontStyle: 'bold', fontSize: 8 },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 50 },
-      2: { cellWidth: 18, halign: 'center' },
-      3: { cellWidth: 22, halign: 'right' },
-      4: { cellWidth: 22, halign: 'center' },
-      5: { cellWidth: 20, halign: 'center' },
-      6: { cellWidth: 28 },
+      0: { fontStyle: 'bold' },
+      1: { halign: 'center' },
+      2: { halign: 'right' },
+      3: { halign: 'right' },
+      4: { halign: 'right' },
+      5: { halign: 'center' },
+      6: { halign: 'right' },
+      7: { halign: 'right' },
+      8: { halign: 'right' },
     },
-    didParseCell: (data) => {
-      if (data.column.index === 4 && data.section === 'body') {
-        if (data.cell.raw === 'PAID') {
-          data.cell.styles.textColor = [22, 163, 74]
-          data.cell.styles.fontStyle = 'bold'
-        } else {
-          data.cell.styles.textColor = [220, 38, 38]
-          data.cell.styles.fontStyle = 'bold'
-        }
-      }
-    },
-    margin: { left: 15, right: 15 },
-    alternateRowStyles: { fillColor: [249, 250, 251] },
   })
 
-  // Footer
-  const pageCount = doc.getNumberOfPages()
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i)
-    doc.setFontSize(8)
-    doc.setTextColor(156, 163, 175)
-    doc.setFont('helvetica', 'italic')
-    doc.text(
-      `Generated on ${new Date().toLocaleDateString()} | Page ${i} of ${pageCount}`,
-      pageW / 2,
-      doc.internal.pageSize.getHeight() - 8,
-      { align: 'center' }
-    )
-  }
-
-  doc.save(`Fee_Report_${monthName}_${year}_${schoolName.replace(/\s+/g, '_')}.pdf`)
+  const filename = `Summary_${opts.schoolName.replace(/\s+/g, '_')}_${opts.month}-${opts.year}.pdf`
+  doc.save(filename)
 }

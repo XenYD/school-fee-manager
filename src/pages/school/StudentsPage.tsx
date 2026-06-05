@@ -16,7 +16,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('')
   const [selectedClass, setSelectedClass] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-  const [form, setForm] = useState({ name: '', class: '', fee_amount: '', parent_phone: '' })
+  const [form, setForm] = useState({ name: '', class: '', fee_amount: '', exam_fee_amount: '', parent_phone: '' })
 
   useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
 
@@ -37,10 +37,15 @@ export default function StudentsPage() {
     }
   }
 
+  function handleClassChange(cls: string) {
+    const autoFee = profile?.schools?.class_fees?.[cls]
+    setForm((f) => ({ ...f, class: cls, fee_amount: autoFee ? String(autoFee) : f.fee_amount }))
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name.trim() || !form.class.trim() || !form.fee_amount) {
-      toast.error('Name, class and fee are required')
+    if (!form.name.trim() || !form.class.trim()) {
+      toast.error('Name and class are required')
       return
     }
     setSaving(true)
@@ -49,13 +54,14 @@ export default function StudentsPage() {
         school_id: profile?.school_id,
         name: form.name.trim(),
         class: form.class.trim(),
-        fee_amount: parseFloat(form.fee_amount),
+        fee_amount: parseFloat(form.fee_amount) || 0,
+        exam_fee_amount: parseFloat(form.exam_fee_amount) || 0,
         parent_phone: form.parent_phone.trim() || null,
       })
       if (error) throw error
       toast.success('Student added!')
       setShowModal(false)
-      setForm({ name: '', class: '', fee_amount: '', parent_phone: '' })
+      setForm({ name: '', class: '', fee_amount: '', exam_fee_amount: '', parent_phone: '' })
       loadStudents()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to add student')
@@ -249,7 +255,8 @@ export default function StudentsPage() {
                   <tr>
                     <th>Name</th>
                     <th>Class</th>
-                    <th>Monthly Fee</th>
+                    <th>School Fee</th>
+                    <th>Exam Fee</th>
                     <th>Phone</th>
                     <th className="text-right">Action</th>
                   </tr>
@@ -274,6 +281,9 @@ export default function StudentsPage() {
                       </td>
                       <td className="font-semibold text-gray-900 text-sm">
                         {Number(student.fee_amount).toLocaleString()}
+                      </td>
+                      <td className="text-sm text-gray-600">
+                        {Number(student.exam_fee_amount) > 0 ? Number(student.exam_fee_amount).toLocaleString() : '—'}
                       </td>
                       <td>
                         {student.parent_phone ? (
@@ -378,16 +388,25 @@ export default function StudentsPage() {
                 <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Full name" className="input-field" required autoFocus />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Class *</label>
+                <input type="text" value={form.class}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  placeholder="e.g. Class 5" className="input-field" required />
+                {profile?.schools?.class_fees?.[form.class] && (
+                  <p className="text-xs text-indigo-500 mt-1">Fee auto-filled from class configuration</p>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Class *</label>
-                  <input type="text" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })}
-                    placeholder="e.g. Class 5" className="input-field" required />
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">School Fee (Rs)</label>
+                  <input type="number" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })}
+                    placeholder="0" className="input-field" min="0" step="1" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Fee Amount *</label>
-                  <input type="number" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })}
-                    placeholder="Monthly fee" className="input-field" min="0" step="0.01" required />
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Exam Fee (Rs)</label>
+                  <input type="number" value={form.exam_fee_amount} onChange={(e) => setForm({ ...form, exam_fee_amount: e.target.value })}
+                    placeholder="0" className="input-field" min="0" step="1" />
                 </div>
               </div>
               <div>

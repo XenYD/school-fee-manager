@@ -50,17 +50,14 @@ export default function AdminDashboard() {
           if (studentIds.length > 0) {
             const { data: feeRecords } = await supabase
               .from('fee_records')
-              .select('student_id, paid')
+              .select('student_id, status, paid_amount')
               .eq('school_id', school.id)
               .eq('month', currentMonth)
               .eq('year', currentYear)
-              .eq('paid', true)
 
-            paidCount = feeRecords?.length ?? 0
-            const paidStudentIds = new Set((feeRecords ?? []).map((r) => r.student_id))
-            totalCollected = (students ?? [])
-              .filter((s) => paidStudentIds.has(s.id))
-              .reduce((sum, s) => sum + Number(s.fee_amount), 0)
+            const paidRecords = (feeRecords ?? []).filter((r) => r.status === 'paid')
+            paidCount = paidRecords.length
+            totalCollected = (feeRecords ?? []).reduce((sum, r) => sum + Number(r.paid_amount ?? 0), 0)
           }
 
           return {

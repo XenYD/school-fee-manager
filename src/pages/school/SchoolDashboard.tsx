@@ -51,24 +51,21 @@ export default function SchoolDashboard() {
       const studentIds = (students ?? []).map((s) => s.id)
       const totalExpected = (students ?? []).reduce((s, st) => s + Number(st.fee_amount), 0)
 
+      let totalCollected = 0
       let paidIds = new Set<string>()
 
       if (studentIds.length > 0) {
         const { data: feeData } = await supabase
           .from('fee_records')
-          .select('student_id')
+          .select('student_id, status, paid_amount')
           .eq('school_id', profile.school_id)
           .eq('month', currentMonth)
           .eq('year', currentYear)
-          .eq('paid', true)
           .in('student_id', studentIds)
 
-        paidIds = new Set((feeData ?? []).map((r) => r.student_id))
+        totalCollected = (feeData ?? []).reduce((sum, r) => sum + Number(r.paid_amount ?? 0), 0)
+        paidIds = new Set((feeData ?? []).filter((r) => r.status === 'paid').map((r) => r.student_id))
       }
-
-      const totalCollected = (students ?? [])
-        .filter((s) => paidIds.has(s.id))
-        .reduce((sum, s) => sum + Number(s.fee_amount), 0)
 
       setStats({
         totalStudents: students?.length ?? 0,

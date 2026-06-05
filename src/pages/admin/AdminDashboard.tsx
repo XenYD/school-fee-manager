@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { School } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { School as SchoolIcon, Users, GraduationCap, TrendingUp, ArrowRight, Plus } from 'lucide-react'
+import { School as SchoolIcon, Users, GraduationCap, TrendingUp, ArrowRight, Plus, RotateCcw, X, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface SchoolWithStats extends School {
@@ -16,6 +16,41 @@ interface SchoolWithStats extends School {
 export default function AdminDashboard() {
   const [schools, setSchools] = useState<SchoolWithStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [showReset, setShowReset] = useState(false)
+  const [resetSchoolId, setResetSchoolId] = useState('')
+  const [resetStep, setResetStep] = useState<'select' | 'confirm'>('select')
+  const [resetting, setResetting] = useState(false)
+
+  async function handleReset() {
+    if (!resetSchoolId) { toast.error('Select a school first'); return }
+    setResetting(true)
+    try {
+      // Delete all payment transactions for this school
+      const { error: txErr } = await supabase
+        .from('payment_transactions')
+        .delete()
+        .eq('school_id', resetSchoolId)
+      if (txErr) throw new Error(txErr.message)
+
+      // Reset all fee records to unpaid (paid_amount = 0, status = unpaid)
+      const { error: recErr } = await supabase
+        .from('fee_records')
+        .update({ paid_amount: 0, status: 'unpaid', paid_by: null })
+        .eq('school_id', resetSchoolId)
+      if (recErr) throw new Error(recErr.message)
+
+      const school = schools.find((s) => s.id === resetSchoolId)
+      toast.success(`All fees reset to unpaid for ${school?.name ?? 'school'}`)
+      setShowReset(false)
+      setResetSchoolId('')
+      setResetStep('select')
+      loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Reset failed')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
@@ -96,10 +131,19 @@ export default function AdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{monthName} overview</p>
         </div>
-        <Link to="/admin/schools" className="btn-primary text-sm">
-          <Plus size={16} />
-          <span className="hidden sm:inline">Add School</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowReset(true); setResetStep('select'); setResetSchoolId('') }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+          >
+            <RotateCcw size={14} />
+            <span className="hidden sm:inline">Reset Fees</span>
+          </button>
+          <Link to="/admin/schools" className="btn-primary text-sm">
+            <Plus size={16} />
+            <span className="hidden sm:inline">Add School</span>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -152,6 +196,104 @@ export default function AdminDashboard() {
           <p className="text-xs text-gray-500 mt-0.5">This month</p>
         </div>
       </div>
+
+      {/* Reset Fees Modal */}
+      {showReset && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+          <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <RotateCcw size={14} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Reset School Fees</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Reset all fees to unpaid for a school</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowReset(false); setResetStep('select') }}
+                className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {resetStep === 'select' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Select School
+                    </label>
+                    <select
+                      value={resetSchoolId}
+                      onChange={(e) => setResetSchoolId(e.target.value)}
+                      className="input-field"
+                      autoFocus
+                    >
+                      <option value="">— Choose a school —</option>
+                      {schools.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+                    This will reset ALL fee records for every student in the selected school back to unpaid and erase all payment history.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowReset(false)}
+                      className="btn-secondary flex-1"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { if (!resetSchoolId) { toast.error('Select a school first'); return } setResetStep('confirm') }}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-200">
+                    <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-700">This cannot be undone</p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        All paid and partial fee records for <strong>{schools.find((s) => s.id === resetSchoolId)?.name}</strong> will be reset to unpaid and all payment transactions will be permanently deleted.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setResetStep('select')}
+                      className="btn-secondary flex-1"
+                      disabled={resetting}
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      disabled={resetting}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
+                    >
+                      {resetting ? (
+                        <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Resetting...</>
+                      ) : (
+                        <><RotateCcw size={14} />Confirm Reset</>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schools List */}
       <div className="card">

@@ -630,9 +630,10 @@ export default function SchoolDetailPage() {
                     key={student.id}
                     student={student}
                     periodMonth={periodMonth} periodYear={periodYear}
-                    processingId={processingId} deleting={deleting}
+                    processingId={processingId} generatingPdf={generatingPdf} deleting={deleting}
                     onPay={(s, ft, rec) => setPaymentTarget({ student: s, feeType: ft, record: rec })}
                     onMarkUnpaid={handleMarkUnpaid}
+                    onReceipt={handleDownloadReceipt}
                     onDelete={handleDeleteStudent}
                     onEditFee={(s) => setEditFeeStudent(s)}
                   />
@@ -975,7 +976,7 @@ function AdminFeeRow({ label, feeRecord, dueAmount, periodMonth, periodYear, isP
         <div className="flex items-center gap-1 flex-shrink-0">
           {feeRecord && <button onClick={onHistory} className="p-1.5 text-gray-400 hover:bg-gray-200 rounded-lg" title="History"><Clock size={13} /></button>}
           {status === 'paid' && <><button onClick={onReceipt} className="p-1.5 text-indigo-400 hover:bg-indigo-100 rounded-lg" title="Receipt"><FileText size={13} /></button><button onClick={onMarkUnpaid} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" title="Reset"><XCircle size={13} /></button></>}
-          {status !== 'paid' && <button onClick={onPay} disabled={isProcessing} className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg">{isProcessing ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Pay'}</button>}
+          {status !== 'paid' && <button onClick={onPay} disabled={isProcessing} className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg">{isProcessing ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Mark Paid'}</button>}
         </div>
       </div>
     </div>
@@ -987,14 +988,16 @@ interface AdminGridCardProps {
   periodMonth: number
   periodYear: number
   processingId: string | null
+  generatingPdf: string | null
   deleting: string | null
   onPay: (s: StudentWithFee, ft: FeeType, rec: FeeRecord | null) => void
   onMarkUnpaid: (s: StudentWithFee, ft: FeeType) => void
+  onReceipt: (s: StudentWithFee, ft: FeeType) => void
   onDelete: (s: StudentWithFee) => void
   onEditFee: (s: StudentWithFee) => void
 }
 
-function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, deleting, onPay, onMarkUnpaid, onDelete, onEditFee }: AdminGridCardProps) {
+function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, generatingPdf, deleting, onPay, onMarkUnpaid, onReceipt, onDelete, onEditFee }: AdminGridCardProps) {
   const sfS = student.school_fee_record?.status ?? 'unpaid'
   const efS = student.exam_fee_record?.status ?? 'unpaid'
   const sfOv = getDaysOverdue(student.school_fee_record, periodMonth, periodYear)
@@ -1008,11 +1011,7 @@ function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, 
           <p className="font-semibold text-gray-900 text-sm truncate">{student.name}</p>
           <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{student.class}</span>
         </div>
-        <button
-          onClick={() => onEditFee(student)}
-          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-          title="Edit fee amounts"
-        >
+        <button onClick={() => onEditFee(student)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit fee amounts">
           <PenLine size={13} />
         </button>
         <button onClick={() => onDelete(student)} disabled={deleting === student.id} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
@@ -1020,6 +1019,7 @@ function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, 
         </button>
       </div>
       {student.parent_phone && <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-500 hover:underline"><Phone size={10} />{student.parent_phone}</a>}
+
       {Number(student.fee_amount) > 0 && (
         <div className="flex items-center justify-between">
           <div>
@@ -1029,18 +1029,35 @@ function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, 
               {sfOv > 0 && sfS !== 'paid' && <span className="text-xs text-red-600">{sfOv}d</span>}
             </div>
           </div>
-          {sfS !== 'paid' ? <button onClick={() => onPay(student, 'school_fee', student.school_fee_record)} disabled={processingId === `${student.id}_school_fee`} className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg">Pay</button>
-            : <button onClick={() => onMarkUnpaid(student, 'school_fee')} className="px-2 py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Reset</button>}
+          <div className="flex items-center gap-1">
+            {sfS === 'paid' && (
+              <button onClick={() => onReceipt(student, 'school_fee')} disabled={generatingPdf === `${student.id}_school_fee_receipt`} className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg" title="Receipt">
+                {generatingPdf === `${student.id}_school_fee_receipt` ? <div className="h-3 w-3 border border-indigo-300 border-t-indigo-600 rounded-full animate-spin" /> : <FileText size={13} />}
+              </button>
+            )}
+            {sfS !== 'paid'
+              ? <button onClick={() => onPay(student, 'school_fee', student.school_fee_record)} disabled={processingId === `${student.id}_school_fee`} className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-60">{processingId === `${student.id}_school_fee` ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Mark Paid'}</button>
+              : <button onClick={() => onMarkUnpaid(student, 'school_fee')} className="px-2 py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Reset</button>}
+          </div>
         </div>
       )}
+
       {Number(student.exam_fee_amount) > 0 && (
         <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
           <div>
             <p className="text-xs text-gray-400">Exam Fee</p>
             {efS === 'paid' ? <span className="text-xs font-semibold text-green-700">Paid</span> : efS === 'partial' ? <span className="text-xs font-semibold text-amber-700">Partial</span> : <span className="text-xs font-semibold text-red-700">Unpaid</span>}
           </div>
-          {efS !== 'paid' ? <button onClick={() => onPay(student, 'exam_fee', student.exam_fee_record)} disabled={processingId === `${student.id}_exam_fee`} className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg">Pay</button>
-            : <button onClick={() => onMarkUnpaid(student, 'exam_fee')} className="px-2 py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Reset</button>}
+          <div className="flex items-center gap-1">
+            {efS === 'paid' && (
+              <button onClick={() => onReceipt(student, 'exam_fee')} disabled={generatingPdf === `${student.id}_exam_fee_receipt`} className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg" title="Receipt">
+                {generatingPdf === `${student.id}_exam_fee_receipt` ? <div className="h-3 w-3 border border-indigo-300 border-t-indigo-600 rounded-full animate-spin" /> : <FileText size={13} />}
+              </button>
+            )}
+            {efS !== 'paid'
+              ? <button onClick={() => onPay(student, 'exam_fee', student.exam_fee_record)} disabled={processingId === `${student.id}_exam_fee`} className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-60">{processingId === `${student.id}_exam_fee` ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Mark Paid'}</button>
+              : <button onClick={() => onMarkUnpaid(student, 'exam_fee')} className="px-2 py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Reset</button>}
+          </div>
         </div>
       )}
     </div>

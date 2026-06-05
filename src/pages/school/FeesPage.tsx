@@ -694,8 +694,10 @@ export default function FeesPage() {
                     periodMonth={periodMonth}
                     periodYear={periodYear}
                     processingId={processingId}
+                    generatingPdf={generatingPdf}
                     onPay={(s, ft, rec) => setPaymentTarget({ student: s, feeType: ft, record: rec })}
                     onMarkUnpaid={handleMarkUnpaid}
+                    onReceipt={handleDownloadReceipt}
                     onEditFee={(s) => setEditFeeStudent(s)}
                   />
                 ))}
@@ -1105,7 +1107,7 @@ function FeeRowItem({
               disabled={isProcessing}
               className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60"
             >
-              {isProcessing ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Pay'}
+              {isProcessing ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Mark Paid'}
             </button>
           )}
         </div>
@@ -1120,12 +1122,14 @@ interface GridCardProps {
   periodMonth: number
   periodYear: number
   processingId: string | null
+  generatingPdf: string | null
   onPay: (s: StudentWithFee, ft: FeeType, rec: FeeRecord | null) => void
   onMarkUnpaid: (s: StudentWithFee, ft: FeeType) => void
+  onReceipt: (s: StudentWithFee, ft: FeeType) => void
   onEditFee: (s: StudentWithFee) => void
 }
 
-function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, onPay, onMarkUnpaid, onEditFee }: GridCardProps) {
+function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, generatingPdf, onPay, onMarkUnpaid, onReceipt, onEditFee }: GridCardProps) {
   const sfStatus = student.school_fee_record?.status ?? 'unpaid'
   const efStatus = student.exam_fee_record?.status ?? 'unpaid'
   const sfOverdue = getDaysOverdue(student.school_fee_record, periodMonth, periodYear)
@@ -1166,14 +1170,28 @@ function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, on
               )}
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            {sfStatus === 'paid' && (
+              <button
+                onClick={() => onReceipt(student, 'school_fee')}
+                disabled={generatingPdf === `${student.id}_school_fee_receipt`}
+                className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors"
+                title="Download receipt"
+              >
+                {generatingPdf === `${student.id}_school_fee_receipt`
+                  ? <div className="h-3 w-3 border border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+                  : <FileText size={13} />}
+              </button>
+            )}
             {sfStatus !== 'paid' ? (
               <button
                 onClick={() => onPay(student, 'school_fee', student.school_fee_record)}
                 disabled={processingId === `${student.id}_school_fee`}
-                className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg"
+                className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-60"
               >
-                Pay
+                {processingId === `${student.id}_school_fee`
+                  ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : 'Mark Paid'}
               </button>
             ) : (
               <button
@@ -1193,14 +1211,28 @@ function StudentFeeGridCard({ student, periodMonth, periodYear, processingId, on
             <p className="text-xs text-gray-400">Exam Fee</p>
             <StatusBadge status={efStatus} />
           </div>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            {efStatus === 'paid' && (
+              <button
+                onClick={() => onReceipt(student, 'exam_fee')}
+                disabled={generatingPdf === `${student.id}_exam_fee_receipt`}
+                className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors"
+                title="Download receipt"
+              >
+                {generatingPdf === `${student.id}_exam_fee_receipt`
+                  ? <div className="h-3 w-3 border border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+                  : <FileText size={13} />}
+              </button>
+            )}
             {efStatus !== 'paid' ? (
               <button
                 onClick={() => onPay(student, 'exam_fee', student.exam_fee_record)}
                 disabled={processingId === `${student.id}_exam_fee`}
-                className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg"
+                className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-60"
               >
-                Pay
+                {processingId === `${student.id}_exam_fee`
+                  ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : 'Mark Paid'}
               </button>
             ) : (
               <button

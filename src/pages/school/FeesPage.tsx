@@ -147,7 +147,7 @@ export default function FeesPage() {
             due_date: getPeriodDueDate(periodMonth, periodYear),
           })
           .select()
-          .single()
+          .maybeSingle()
         if (insErr) throw new Error(insErr.message)
         if (!newRec) throw new Error('Failed to create fee record')
         recordId = newRec.id
@@ -211,7 +211,7 @@ export default function FeesPage() {
                 status: 'unpaid', due_date: getPeriodDueDate(periodMonth, periodYear),
               })
               .select()
-              .single()
+              .maybeSingle()
 
             if (insErr) {
               if (insErr.code === '23505') {
@@ -223,8 +223,9 @@ export default function FeesPage() {
                   .eq('month', periodMonth)
                   .eq('year', periodYear)
                   .eq('fee_type', feeType)
-                  .single()
+                  .maybeSingle()
                 if (selErr) throw new Error(selErr.message)
+                if (!existing) throw new Error(`Fee record not found after conflict for ${student.name} (${feeType})`)
                 feeRecord = existing
               } else {
                 throw new Error(insErr.message)

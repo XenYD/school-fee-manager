@@ -222,13 +222,14 @@ export default function SchoolDetailPage() {
       const currentPaid = record?.paid_amount ?? 0
 
       if (!record) {
-        const { data: nr, error } = await supabase.from('fee_records').insert({
+        const { data: nr, error: insErr } = await supabase.from('fee_records').insert({
           student_id: student.id, school_id: schoolId,
           month: periodMonth, year: periodYear, fee_type: feeType,
           due_amount: currentDue, paid_amount: 0, status: 'unpaid',
-          due_date: getPeriodDueDate(periodMonth, periodYear), paid_by: profile?.id,
+          due_date: getPeriodDueDate(periodMonth, periodYear),
         }).select().single()
-        if (error) throw error
+        if (insErr) throw new Error(insErr.message)
+        if (!nr) throw new Error('Failed to create fee record')
         recordId = nr.id
       }
 
@@ -236,17 +237,18 @@ export default function SchoolDetailPage() {
         fee_record_id: recordId, student_id: student.id, school_id: schoolId,
         amount, payment_method: method, paid_by: profile?.id,
       })
-      if (txErr) throw txErr
+      if (txErr) throw new Error(txErr.message)
 
       const newPaid = currentPaid + amount
       const newStatus: FeeStatus = newPaid >= currentDue ? 'paid' : 'partial'
-      await supabase.from('fee_records').update({ paid_amount: newPaid, status: newStatus, paid_by: profile?.id }).eq('id', recordId)
+      const { error: upErr } = await supabase.from('fee_records').update({ paid_amount: newPaid, status: newStatus, paid_by: profile?.id }).eq('id', recordId)
+      if (upErr) throw new Error(upErr.message)
 
       toast.success(newStatus === 'paid' ? `Fully paid · ${method === 'cash' ? 'Cash' : 'Online'}` : `Partial recorded`)
 
       loadData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Payment failed')
+      toast.error(err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Payment failed')
     } finally {
       setProcessingId(null)
     }
@@ -258,33 +260,66 @@ export default function SchoolDetailPage() {
     let totalProcessed = 0
     try {
       for (const feeType of feeTypes) {
-        const feeAmountKey = feeType === 'school_fee' ? 'fee_amount' : 'exam_fee_amount'
-        const recordKey = feeType === 'school_fee' ? 'school_fee_record' : 'exam_fee_record'
-        const targets = classFilteredStudents.filter(
-          (s) => (s[recordKey]?.status ?? 'unpaid') !== 'paid' && Number(s[feeAmountKey]) > 0
-        )
+        const targets = classFilteredStudents.filter((s) => {
+          const rec = feeType === 'school_fee' ? s.school_fee_record : s.exam_fee_record
+          const amt = feeType === 'school_fee' ? Number(s.fee_amount) : Number(s.exam_fee_amount)
+          return (rec?.status ?? 'unpaid') !== 'paid' && amt > 0
+        })
         for (const student of targets) {
-          const record = student[recordKey]
-          const due = record?.due_amount ?? Number(student[feeAmountKey])
-          const paid = record?.paid_amount ?? 0
+          const cachedRecord = feeType === 'school_fee' ? student.school_fee_record : student.exam_fee_record
+          const feeAmt = feeType === 'school_fee' ? Number(student.fee_amount) : Number(student.exam_fee_amount)
+          let feeRecord = cachedRecord
+
+          if (!feeRecord) {
+            const { data: inserted, error: insErr } = await supabase
+              .from('fee_records')
+              .insert({
+                student_id: student.id, school_id: schoolId,
+                month: periodMonth, year: periodYear, fee_type: feeType,
+                due_amount: feeAmt, paid_amount: 0, status: 'unpaid',
+                due_date: getPeriodDueDate(periodMonth, periodYear),
+              })
+              .select()
+              .single()
+
+            if (insErr) {
+              if (insErr.code === '23505') {
+                const { data: existing, error: selErr } = await supabase
+                  .from('fee_records')
+                  .select('*')
+                  .eq('student_id', student.id)
+                  .eq('month', periodMonth)
+                  .eq('year', periodYear)
+                  .eq('fee_type', feeType)
+                  .single()
+                if (selErr) throw new Error(selErr.message)
+                feeRecord = existing
+              } else {
+                throw new Error(insErr.message)
+              }
+            } else {
+              feeRecord = inserted
+            }
+          }
+
+          if (!feeRecord) throw new Error('Could not create or fetch fee record')
+
+          const due = feeRecord.due_amount ?? feeAmt
+          const paid = feeRecord.paid_amount ?? 0
           const payAmt = due - paid
           if (payAmt <= 0) continue
-          let recordId = record?.id
-          if (!record) {
-            const { data: nr, error } = await supabase.from('fee_records').insert({
-              student_id: student.id, school_id: schoolId,
-              month: periodMonth, year: periodYear, fee_type: feeType,
-              due_amount: due, paid_amount: 0, status: 'unpaid',
-              due_date: getPeriodDueDate(periodMonth, periodYear), paid_by: profile?.id,
-            }).select().single()
-            if (error) throw error
-            recordId = nr.id
-          }
-          await supabase.from('payment_transactions').insert({
-            fee_record_id: recordId, student_id: student.id, school_id: schoolId,
+
+          const { error: txErr } = await supabase.from('payment_transactions').insert({
+            fee_record_id: feeRecord.id, student_id: student.id, school_id: schoolId,
             amount: payAmt, payment_method: method, paid_by: profile?.id,
           })
-          await supabase.from('fee_records').update({ paid_amount: due, status: 'paid', paid_by: profile?.id }).eq('id', recordId)
+          if (txErr) throw new Error(txErr.message)
+
+          const { error: upErr } = await supabase.from('fee_records')
+            .update({ paid_amount: due, status: 'paid', paid_by: profile?.id })
+            .eq('id', feeRecord.id)
+          if (upErr) throw new Error(upErr.message)
+
           totalProcessed++
         }
       }
@@ -296,7 +331,7 @@ export default function SchoolDetailPage() {
       }
       loadData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Bulk payment failed')
+      toast.error(err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Bulk payment failed')
     } finally {
       setMarkingAllPaid(false)
     }

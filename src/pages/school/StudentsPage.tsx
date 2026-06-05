@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { GraduationCap, Plus, Trash2, X, Search, Phone, ListFilter } from 'lucide-react'
+import { GraduationCap, Plus, Trash2, X, Search, Phone, ListFilter, LayoutList, LayoutGrid } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
@@ -15,6 +15,7 @@ export default function StudentsPage() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedClass, setSelectedClass] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [form, setForm] = useState({ name: '', class: '', fee_amount: '', parent_phone: '' })
 
   useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
@@ -211,71 +212,141 @@ export default function StudentsPage() {
         </div>
       ) : (
         <div className="card !p-0 overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 text-sm">
-              {selectedClass ? `${selectedClass} Students` : 'All Students'}
-            </h2>
-            <span className="text-xs text-gray-500">
-              {filtered.length}{filtered.length !== students.length ? ` of ${students.length}` : ''} shown
-            </span>
+          {/* Card header with view toggle */}
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="font-semibold text-gray-900 text-sm truncate">
+                {selectedClass ? `${selectedClass} Students` : 'All Students'}
+              </h2>
+              <span className="text-xs text-gray-400 flex-shrink-0">
+                {filtered.length}{filtered.length !== students.length ? ` / ${students.length}` : ''}
+              </span>
+            </div>
+            {/* View toggle */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 flex-shrink-0">
+              <button
+                onClick={() => setViewMode('list')}
+                title="List view"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <LayoutList size={15} />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <LayoutGrid size={15} />
+              </button>
+            </div>
           </div>
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Class</th>
-                  <th>Monthly Fee</th>
-                  <th>Phone</th>
-                  <th className="text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((student) => (
-                  <tr key={student.id}>
-                    <td>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-indigo-600 text-xs font-semibold">
-                            {student.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="font-medium text-gray-900 text-sm">{student.name}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium">
-                        {student.class}
-                      </span>
-                    </td>
-                    <td className="font-semibold text-gray-900 text-sm">
-                      {Number(student.fee_amount).toLocaleString()}
-                    </td>
-                    <td>
-                      {student.parent_phone ? (
-                        <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
-                          <Phone size={11} /> {student.parent_phone}
-                        </a>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      <button
-                        onClick={() => handleDelete(student)}
-                        disabled={deleting === student.id}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        {deleting === student.id
-                          ? <div className="h-4 w-4 border border-gray-400 border-t-red-500 rounded-full animate-spin" />
-                          : <Trash2 size={15} />}
-                      </button>
-                    </td>
+
+          {/* List view */}
+          {viewMode === 'list' && (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Monthly Fee</th>
+                    <th>Phone</th>
+                    <th className="text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((student) => (
+                    <tr key={student.id}>
+                      <td>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-indigo-600 text-xs font-semibold">
+                              {student.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="font-medium text-gray-900 text-sm">{student.name}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium">
+                          {student.class}
+                        </span>
+                      </td>
+                      <td className="font-semibold text-gray-900 text-sm">
+                        {Number(student.fee_amount).toLocaleString()}
+                      </td>
+                      <td>
+                        {student.parent_phone ? (
+                          <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                            <Phone size={11} /> {student.parent_phone}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="text-right">
+                        <button
+                          onClick={() => handleDelete(student)}
+                          disabled={deleting === student.id}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          {deleting === student.id
+                            ? <div className="h-4 w-4 border border-gray-400 border-t-red-500 rounded-full animate-spin" />
+                            : <Trash2 size={15} />}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Grid view */}
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
+              {filtered.map((student) => (
+                <div
+                  key={student.id}
+                  className="relative bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center gap-2.5 hover:border-indigo-200 hover:shadow-sm transition-all"
+                >
+                  {/* Delete button */}
+                  <button
+                    onClick={() => handleDelete(student)}
+                    disabled={deleting === student.id}
+                    className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Remove student"
+                  >
+                    {deleting === student.id
+                      ? <div className="h-3.5 w-3.5 border border-gray-300 border-t-red-500 rounded-full animate-spin" />
+                      : <Trash2 size={13} />}
+                  </button>
+
+                  {/* Avatar */}
+                  <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mt-1 flex-shrink-0">
+                    <span className="text-indigo-600 text-xl font-bold">
+                      {student.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* Name */}
+                  <p className="font-semibold text-gray-900 text-sm text-center leading-tight line-clamp-2 w-full">
+                    {student.name}
+                  </p>
+
+                  {/* Class badge */}
+                  <span className="text-xs bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full font-medium">
+                    {student.class}
+                  </span>
+
+                  {/* Fee amount */}
+                  <p className="text-base font-bold text-gray-900">
+                    {Number(student.fee_amount).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

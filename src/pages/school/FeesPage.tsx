@@ -8,6 +8,7 @@ import { generateReceipt, generateSummaryReport } from '../../utils/pdf'
 import {
   CheckCircle2, XCircle, Download, FileText, ChevronLeft, ChevronRight,
   Search, Filter, BadgeDollarSign, ListFilter, CheckCheck, Banknote, Smartphone,
+  LayoutList, LayoutGrid,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -27,6 +28,8 @@ export default function FeesPage() {
   // Payment modal state
   const [paymentStudent, setPaymentStudent] = useState<StudentWithFee | null>(null)
   const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false)
+
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
 
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -348,7 +351,7 @@ export default function FeesPage() {
         </div>
       )}
 
-      {/* Student Fee Cards */}
+      {/* Student Fee List / Grid */}
       {students.length === 0 ? (
         <div className="card text-center py-12">
           <BadgeDollarSign size={48} className="text-gray-300 mx-auto mb-4" />
@@ -363,86 +366,175 @@ export default function FeesPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {displayStudents.map((student) => {
-            const paid       = student.fee_record?.paid ?? false
-            const isToggling = togglingFee === student.id
-            const isGenerating = generatingPdf === student.id
-            const paidDate   = student.fee_record?.paid_date
-              ? new Date(student.fee_record.paid_date).toLocaleDateString() : null
-            const payMethod  = student.fee_record?.payment_method ?? null
-
-            return (
-              <div
-                key={student.id}
-                className={`bg-white rounded-xl border transition-all p-4 ${paid ? 'border-green-200' : 'border-gray-200'}`}
+        <>
+          {/* View toggle bar */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {displayStudents.length} student{displayStudents.length !== 1 ? 's' : ''}
+              {displayStudents.length !== students.length ? ` shown` : ''}
+            </p>
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('list')}
+                title="List view"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
               >
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${paid ? 'bg-green-100' : 'bg-gray-100'}`}>
-                    <span className={`text-sm font-bold ${paid ? 'text-green-700' : 'text-gray-600'}`}>
-                      {student.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+                <LayoutList size={15} />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <LayoutGrid size={15} />
+              </button>
+            </div>
+          </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-gray-900 text-sm">{student.name}</p>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{student.class}</span>
-                      {paid
-                        ? <span className="badge-paid"><CheckCircle2 size={10} /> Paid</span>
-                        : <span className="badge-unpaid"><XCircle size={10} /> Unpaid</span>}
-                      {/* Payment method badge */}
-                      {paid && payMethod && (
-                        <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${
-                          payMethod === 'cash'
-                            ? 'bg-green-50 text-green-700'
-                            : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          {payMethod === 'cash'
-                            ? <><Banknote size={10} /> Cash</>
-                            : <><Smartphone size={10} /> Online</>}
+          {/* ── LIST VIEW ─────────────────────────────────────────────── */}
+          {viewMode === 'list' && (
+            <div className="space-y-2.5">
+              {displayStudents.map((student) => {
+                const paid       = student.fee_record?.paid ?? false
+                const isToggling = togglingFee === student.id
+                const isGenerating = generatingPdf === student.id
+                const paidDate   = student.fee_record?.paid_date
+                  ? new Date(student.fee_record.paid_date).toLocaleDateString() : null
+                const payMethod  = student.fee_record?.payment_method ?? null
+
+                return (
+                  <div
+                    key={student.id}
+                    className={`bg-white rounded-xl border transition-all p-4 ${paid ? 'border-green-200' : 'border-gray-200'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${paid ? 'bg-green-100' : 'bg-gray-100'}`}>
+                        <span className={`text-sm font-bold ${paid ? 'text-green-700' : 'text-gray-600'}`}>
+                          {student.name.charAt(0).toUpperCase()}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-sm font-bold text-gray-900">{Number(student.fee_amount).toLocaleString()}</span>
-                      {paidDate && <span className="text-xs text-green-600">• Paid {paidDate}</span>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-900 text-sm">{student.name}</p>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{student.class}</span>
+                          {paid
+                            ? <span className="badge-paid"><CheckCircle2 size={10} /> Paid</span>
+                            : <span className="badge-unpaid"><XCircle size={10} /> Unpaid</span>}
+                          {paid && payMethod && (
+                            <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${
+                              payMethod === 'cash' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
+                            }`}>
+                              {payMethod === 'cash' ? <><Banknote size={10} /> Cash</> : <><Smartphone size={10} /> Online</>}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-sm font-bold text-gray-900">{Number(student.fee_amount).toLocaleString()}</span>
+                          {paidDate && <span className="text-xs text-green-600">• Paid {paidDate}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {paid && (
+                          <button onClick={() => handleDownloadReceipt(student)} disabled={isGenerating}
+                            className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors" title="Download receipt">
+                            {isGenerating
+                              ? <div className="h-4 w-4 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+                              : <FileText size={16} />}
+                          </button>
+                        )}
+                        <button onClick={() => handleToggle(student)} disabled={isToggling}
+                          className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                            paid ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'
+                          }`}>
+                          {isToggling
+                            ? <div className="h-3.5 w-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+                            : paid ? 'Mark Unpaid' : 'Mark Paid'}
+                        </button>
+                      </div>
                     </div>
                   </div>
+                )
+              })}
+            </div>
+          )}
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {paid && (
-                      <button
-                        onClick={() => handleDownloadReceipt(student)}
-                        disabled={isGenerating}
-                        className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Download receipt"
-                      >
-                        {isGenerating
-                          ? <div className="h-4 w-4 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
-                          : <FileText size={16} />}
+          {/* ── GRID VIEW ─────────────────────────────────────────────── */}
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {displayStudents.map((student) => {
+                const paid       = student.fee_record?.paid ?? false
+                const isToggling = togglingFee === student.id
+                const isGenerating = generatingPdf === student.id
+                const paidDate   = student.fee_record?.paid_date
+                  ? new Date(student.fee_record.paid_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                  : null
+                const payMethod  = student.fee_record?.payment_method ?? null
+
+                return (
+                  <div
+                    key={student.id}
+                    className={`bg-white rounded-xl border flex flex-col gap-3 p-3.5 transition-all ${paid ? 'border-green-200' : 'border-gray-200'}`}
+                  >
+                    {/* Avatar + status row */}
+                    <div className="flex items-center gap-2">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${paid ? 'bg-green-100' : 'bg-gray-100'}`}>
+                        <span className={`text-sm font-bold ${paid ? 'text-green-700' : 'text-gray-600'}`}>
+                          {student.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        {paid
+                          ? <span className="badge-paid"><CheckCircle2 size={9} /> Paid</span>
+                          : <span className="badge-unpaid"><XCircle size={9} /> Unpaid</span>}
+                      </div>
+                    </div>
+
+                    {/* Name + class + method */}
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">{student.name}</p>
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{student.class}</span>
+                        {paid && payMethod && (
+                          <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded font-medium ${
+                            payMethod === 'cash' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
+                          }`}>
+                            {payMethod === 'cash' ? <><Banknote size={9} /> Cash</> : <><Smartphone size={9} /> Online</>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fee + date */}
+                    <div>
+                      <p className="text-base font-bold text-gray-900">{Number(student.fee_amount).toLocaleString()}</p>
+                      {paidDate && <p className="text-xs text-green-600 mt-0.5">Paid {paidDate}</p>}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-1.5 mt-auto">
+                      {paid && (
+                        <button onClick={() => handleDownloadReceipt(student)} disabled={isGenerating}
+                          className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0" title="Download receipt">
+                          {isGenerating
+                            ? <div className="h-3.5 w-3.5 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+                            : <FileText size={14} />}
+                        </button>
+                      )}
+                      <button onClick={() => handleToggle(student)} disabled={isToggling}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors text-center ${
+                          paid ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'
+                        }`}>
+                        {isToggling
+                          ? <div className="h-3.5 w-3.5 border border-current border-t-transparent rounded-full animate-spin mx-auto" />
+                          : paid ? 'Mark Unpaid' : 'Mark Paid'}
                       </button>
-                    )}
-                    <button
-                      onClick={() => handleToggle(student)}
-                      disabled={isToggling}
-                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                        paid ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'
-                      }`}
-                    >
-                      {isToggling
-                        ? <div className="h-3.5 w-3.5 border border-current border-t-transparent rounded-full animate-spin" />
-                        : paid ? 'Mark Unpaid' : 'Mark Paid'}
-                    </button>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {/* Single student payment modal */}

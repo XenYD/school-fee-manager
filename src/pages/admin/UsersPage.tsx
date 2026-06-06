@@ -5,7 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import {
   Users, Save, X, Shield, UserCheck, GraduationCap,
   Search, AlertTriangle, Building2, ChevronDown, CheckCircle2,
-  RefreshCw, Info, Eye,
+  RefreshCw, Info, Eye, Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -29,6 +29,8 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [editMap, setEditMap] = useState<Record<string, EditState>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Profile | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -97,6 +99,24 @@ export default function UsersPage() {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSavingId(null)
+    }
+  }
+
+  async function deleteUser(profile: Profile) {
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', profile.id)
+      if (error) throw error
+      toast.success(`${profile.full_name} removed`)
+      setConfirmDelete(null)
+      loadData(true)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Remove failed')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -238,14 +258,23 @@ export default function UsersPage() {
                     )}
                   </div>
 
-                  {/* Edit toggle */}
+                  {/* Actions */}
                   {!isEditing && (
-                    <button
-                      onClick={() => startEdit(profile)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors flex-shrink-0"
-                    >
-                      <ChevronDown size={14} /> Edit
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => startEdit(profile)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors"
+                      >
+                        <ChevronDown size={14} /> Edit
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(profile)}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remove user"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -339,6 +368,63 @@ export default function UsersPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── Remove User Confirmation Modal ─────────────────────────── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="modal-box w-full max-w-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={18} className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Remove User</h3>
+                <p className="text-xs text-gray-500 mt-0.5">This action cannot be undone</p>
+              </div>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4">
+              <p className="text-sm text-red-800">
+                Are you sure you want to remove{' '}
+                <span className="font-bold">{confirmDelete.full_name}</span>?
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                {confirmDelete.email}
+              </p>
+              <p className="text-xs text-red-600 mt-2">
+                Their account will be removed from the app. They won't be able to log in until re-added.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+                className="btn-secondary flex-1 text-sm py-2"
+              >
+                <X size={14} /> Cancel
+              </button>
+              <button
+                onClick={() => deleteUser(confirmDelete)}
+                disabled={deleting}
+                className="flex-1 flex items-center justify-center gap-2 text-sm font-semibold py-2 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-60"
+              >
+                {deleting ? (
+                  <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Removing...</>
+                ) : (
+                  <><Trash2 size={14} /> Remove User</>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useState, ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import {
   LayoutDashboard,
   School,
@@ -12,6 +13,8 @@ import {
   X,
   ChevronRight,
   BookOpen,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -27,27 +30,28 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { profile, signOut } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const adminNav: NavItem[] = [
-    { to: '/admin', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/admin/schools', icon: <School size={20} />, label: 'Schools' },
-    { to: '/admin/users', icon: <Users size={20} />, label: 'Users' },
+    { to: '/admin', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { to: '/admin/schools', icon: <School size={18} />, label: 'Schools' },
+    { to: '/admin/users', icon: <Users size={18} />, label: 'Users' },
   ]
 
   const schoolNav: NavItem[] = [
-    { to: '/school', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/school/students', icon: <GraduationCap size={20} />, label: 'Students' },
-    { to: '/school/fees', icon: <BadgeDollarSign size={20} />, label: 'Fees' },
+    { to: '/school', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { to: '/school/students', icon: <GraduationCap size={18} />, label: 'Students' },
+    { to: '/school/fees', icon: <BadgeDollarSign size={18} />, label: 'Fees' },
   ]
 
   const navItems = profile?.role === 'admin' ? adminNav : schoolNav
 
   const roleBadge = {
-    admin: { label: 'Admin', color: 'bg-purple-100 text-purple-700' },
-    school_owner: { label: 'Principal', color: 'bg-blue-100 text-blue-700' },
-    staff: { label: 'Staff', color: 'bg-green-100 text-green-700' },
+    admin: { label: 'Admin', cls: 'bg-purple-500/20 text-purple-200 border border-purple-400/30' },
+    school_owner: { label: 'Principal', cls: 'bg-blue-500/20 text-blue-200 border border-blue-400/30' },
+    staff: { label: 'Staff', cls: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30' },
   }[profile?.role ?? 'staff']
 
   async function handleSignOut() {
@@ -61,49 +65,60 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
       isActive
-        ? 'bg-indigo-50 text-indigo-700'
-        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        ? 'bg-[var(--c-nav-active-bg)] text-white shadow-sm'
+        : 'text-[var(--c-sidebar-muted)] hover:bg-[var(--c-nav-hover-bg)] hover:text-white'
     }`
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[var(--c-sidebar)]">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-gray-200">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <BookOpen size={20} className="text-white" />
+      <div className="px-5 py-5 border-b border-[var(--c-sidebar-border)]">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #4A90D9, #357ABD)' }}
+          >
+            <BookOpen size={18} className="text-white" />
           </div>
           <div>
-            <p className="font-bold text-gray-900 text-sm leading-tight">Fee Manager</p>
-            <p className="text-xs text-gray-500 leading-tight">School System</p>
+            <p className="font-bold text-white text-sm leading-tight">Fee Manager</p>
+            <p className="text-xs text-[var(--c-sidebar-muted)] leading-tight">School System</p>
           </div>
         </div>
       </div>
 
       {/* User info */}
-      <div className="px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-indigo-600 font-semibold text-sm">
-              {profile?.full_name?.charAt(0)?.toUpperCase() ?? '?'}
-            </span>
+      <div className="px-4 py-3 border-b border-[var(--c-sidebar-border)]">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-sm"
+            style={{ background: 'linear-gradient(135deg, #4A90D9, #2C5F8A)' }}
+          >
+            {profile?.full_name?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-900 truncate">{profile?.full_name}</p>
+            <p className="text-sm font-semibold text-white truncate leading-tight">
+              {profile?.full_name}
+            </p>
             {profile?.schools && (
-              <p className="text-xs text-gray-500 truncate">{profile.schools.name}</p>
+              <p className="text-xs text-[var(--c-sidebar-muted)] truncate leading-tight">
+                {profile.schools.name}
+              </p>
             )}
           </div>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleBadge.color}`}>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleBadge.cls}`}>
             {roleBadge.label}
           </span>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--c-sidebar-muted)] px-3 mb-2">
+          Navigation
+        </p>
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -118,13 +133,24 @@ export default function Layout({ children }: LayoutProps) {
         ))}
       </nav>
 
-      {/* Sign out */}
-      <div className="px-3 pb-4 border-t border-gray-100 pt-3">
+      {/* Bottom: theme toggle + sign out */}
+      <div className="px-3 pb-4 space-y-1 border-t border-[var(--c-sidebar-border)] pt-3">
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--c-sidebar-muted)] hover:bg-[var(--c-nav-hover-bg)] hover:text-white transition-all duration-150"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
+
+        {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--c-sidebar-muted)] hover:bg-red-500/15 hover:text-red-300 transition-all duration-150"
         >
-          <LogOut size={20} />
+          <LogOut size={18} />
           <span>Sign Out</span>
         </button>
       </div>
@@ -132,30 +158,30 @@ export default function Layout({ children }: LayoutProps) {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--c-bg)' }}>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col bg-white border-r border-gray-200 z-30">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col z-30 shadow-xl">
         <SidebarContent />
       </aside>
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+          className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 w-72 bg-white z-50 shadow-2xl transform transition-transform duration-300 ${
+        className={`md:hidden fixed inset-y-0 left-0 w-72 z-50 shadow-2xl transform transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 z-10">
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X size={20} />
           </button>
@@ -165,40 +191,69 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main Content Area */}
       <div className="md:pl-60">
-        {/* Top Header (mobile) */}
-        <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 md:hidden">
+        {/* Mobile Top Header */}
+        <header
+          className="sticky top-0 z-20 px-4 py-3 flex items-center gap-3 md:hidden border-b"
+          style={{
+            backgroundColor: 'var(--c-sidebar)',
+            borderColor: 'var(--c-sidebar-border)',
+          }}
+        >
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 -ml-2"
+            className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 -ml-2 transition-colors"
           >
             <Menu size={22} />
           </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-7 h-7 bg-indigo-600 rounded-md flex items-center justify-center flex-shrink-0">
-              <BookOpen size={15} className="text-white" />
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #4A90D9, #357ABD)' }}
+            >
+              <BookOpen size={14} className="text-white" />
             </div>
-            <span className="font-semibold text-gray-900 text-sm truncate">Fee Manager</span>
+            <span className="font-bold text-white text-sm truncate">Fee Manager</span>
           </div>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleBadge.color}`}>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleBadge.cls}`}>
             {roleBadge.label}
           </span>
         </header>
 
-        {/* Desktop header bar */}
-        <header className="hidden md:flex sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-3 items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+        {/* Desktop Top Header */}
+        <header
+          className="hidden md:flex sticky top-0 z-20 px-6 py-3 items-center justify-between border-b"
+          style={{
+            backgroundColor: 'var(--c-surface)',
+            borderColor: 'var(--c-border)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--c-text-3)' }}>
             <span>Welcome back,</span>
-            <span className="font-medium text-gray-900">{profile?.full_name}</span>
+            <span className="font-semibold" style={{ color: 'var(--c-text-1)' }}>
+              {profile?.full_name}
+            </span>
             {profile?.schools && (
               <>
                 <ChevronRight size={14} />
-                <span className="text-indigo-600 font-medium">{profile.schools.name}</span>
+                <span className="font-medium" style={{ color: 'var(--c-accent)' }}>
+                  {profile.schools.name}
+                </span>
               </>
             )}
           </div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50"
+            className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--c-text-3)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--c-danger)'
+              e.currentTarget.style.backgroundColor = 'var(--c-danger-bg)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--c-text-3)'
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }}
           >
             <LogOut size={16} />
             <span>Sign Out</span>

@@ -6,7 +6,7 @@ import { CLASS_LIST } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import {
   School as SchoolIcon, Plus, Trash2, ChevronRight, Phone, MapPin, X,
-  CalendarDays, RefreshCcw, ChevronDown, ChevronUp,
+  CalendarDays, RefreshCcw, ChevronDown, ChevronUp, Pencil,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -33,6 +33,8 @@ export default function SchoolsPage() {
   const [schools, setSchools] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [showClassFees, setShowClassFees] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -52,37 +54,6 @@ export default function SchoolsPage() {
     }
   }
 
-  async function handleAddSchool(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.name.trim()) { toast.error('School name is required'); return }
-    setSaving(true)
-    try {
-      // Convert class_fees strings to numbers, skip empty
-      const classFees: Record<string, number> = {}
-      for (const [cls, val] of Object.entries(form.class_fees)) {
-        const num = parseFloat(val)
-        if (!isNaN(num) && num > 0) classFees[cls] = num
-      }
-
-      const { error } = await supabase.from('schools').insert({
-        name: form.name.trim(),
-        address: form.address.trim() || null,
-        phone: form.phone.trim() || null,
-        fee_reset_type: form.fee_reset_type,
-        class_fees: classFees,
-      })
-      if (error) throw error
-      toast.success(`School "${form.name}" added`)
-      setShowModal(false)
-      setShowClassFees(false)
-      setForm(initForm())
-      loadSchools()
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add school')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function handleDelete(school: School) {
     if (
@@ -102,8 +73,77 @@ export default function SchoolsPage() {
     }
   }
 
+  async function handleSaveSchool(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.name.trim()) { toast.error('School name is required'); return }
+    setSaving(true)
+    try {
+      const classFees: Record<string, number> = {}
+      for (const [cls, val] of Object.entries(form.class_fees)) {
+        const num = parseFloat(val)
+        if (!isNaN(num) && num > 0) classFees[cls] = num
+      }
+
+      if (modalMode === 'edit' && editingId) {
+        const { error } = await supabase
+          .from('schools')
+          .update({
+            name: form.name.trim(),
+            address: form.address.trim() || null,
+            phone: form.phone.trim() || null,
+            fee_reset_type: form.fee_reset_type,
+            class_fees: classFees,
+          })
+          .eq('id', editingId)
+        if (error) throw error
+        toast.success(`"${form.name}" updated`)
+      } else {
+        const { error } = await supabase.from('schools').insert({
+          name: form.name.trim(),
+          address: form.address.trim() || null,
+          phone: form.phone.trim() || null,
+          fee_reset_type: form.fee_reset_type,
+          class_fees: classFees,
+        })
+        if (error) throw error
+        toast.success(`School "${form.name}" added`)
+      }
+
+      setShowModal(false)
+      setEditingId(null)
+      setShowClassFees(false)
+      setForm(initForm())
+      loadSchools()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save school')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function openModal() {
+    setModalMode('add')
+    setEditingId(null)
     setForm(initForm())
+    setShowClassFees(false)
+    setShowModal(true)
+  }
+
+  function openEdit(school: School) {
+    setModalMode('edit')
+    setEditingId(school.id)
+    // Re-build class_fees as string map for the form inputs
+    const classFees = initClassFees()
+    for (const [cls, val] of Object.entries(school.class_fees ?? {})) {
+      classFees[cls] = String(val)
+    }
+    setForm({
+      name: school.name,
+      address: school.address ?? '',
+      phone: school.phone ?? '',
+      fee_reset_type: school.fee_reset_type ?? 'monthly',
+      class_fees: classFees,
+    })
     setShowClassFees(false)
     setShowModal(true)
   }
@@ -159,17 +199,28 @@ export default function SchoolsPage() {
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDelete(school)}
-                      disabled={deleting === school.id}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-                    >
-                      {deleting === school.id ? (
-                        <div className="h-4 w-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => openEdit(school)}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Edit school"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(school)}
+                        disabled={deleting === school.id}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete school"
+                      >
+                        {deleting === school.id ? (
+                          <div className="h-4 w-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mt-3 space-y-1.5">
@@ -209,14 +260,33 @@ export default function SchoolsPage() {
         </div>
       )}
 
-      {/* Add School Modal */}
+      {/* Add / Edit School Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
           <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-              <h3 className="font-semibold text-gray-900 text-lg">Add New School</h3>
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: 'var(--c-accent-bg)' }}
+                >
+                  {modalMode === 'edit' ? (
+                    <Pencil size={15} style={{ color: 'var(--c-accent)' }} />
+                  ) : (
+                    <Plus size={15} style={{ color: 'var(--c-accent)' }} />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-base leading-tight">
+                    {modalMode === 'edit' ? 'Edit School' : 'Add New School'}
+                  </h3>
+                  {modalMode === 'edit' && (
+                    <p className="text-xs text-gray-400 leading-tight">Update school details</p>
+                  )}
+                </div>
+              </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => { setShowModal(false); setEditingId(null) }}
                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"
               >
                 <X size={20} />
@@ -224,7 +294,7 @@ export default function SchoolsPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <form onSubmit={handleAddSchool} className="p-5 space-y-5">
+              <form onSubmit={handleSaveSchool} className="p-5 space-y-5">
                 {/* Basic info */}
                 <div className="space-y-4">
                   <div>
@@ -379,7 +449,7 @@ export default function SchoolsPage() {
                 <div className="flex gap-3 pt-1 pb-1">
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => { setShowModal(false); setEditingId(null) }}
                     className="btn-secondary flex-1"
                   >
                     Cancel
@@ -390,6 +460,8 @@ export default function SchoolsPage() {
                         <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Saving...
                       </>
+                    ) : modalMode === 'edit' ? (
+                      'Save Changes'
                     ) : (
                       'Add School'
                     )}

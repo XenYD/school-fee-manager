@@ -29,7 +29,7 @@ export default function LoadingSpinner({ size = 'md', fullPage = false, text }: 
     return (
       <div
         className="fixed inset-0 flex items-center justify-center z-50"
-        style={{ backgroundColor: 'var(--c-bg)' }}
+        style={{ backgroundColor: 'transparent', backdropFilter: 'blur(4px)' }}
       >
         {spinner}
       </div>

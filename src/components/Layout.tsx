@@ -72,7 +72,15 @@ export default function Layout({ children }: LayoutProps) {
     }`
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-[var(--c-sidebar)]">
+    <div
+      className="flex flex-col h-full"
+      style={{
+        background: 'var(--c-sidebar)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderRight: '1px solid var(--c-sidebar-border)',
+      }}
+    >
       {/* Logo */}
       <div className="px-5 py-5 border-b border-[var(--c-sidebar-border)]">
         <div className="flex items-center gap-3">
@@ -158,9 +166,9 @@ export default function Layout({ children }: LayoutProps) {
   )
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--c-bg)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'transparent' }}>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col z-30 shadow-xl">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col z-30" style={{ boxShadow: '4px 0 32px rgba(0,0,0,0.35)' }}>
         <SidebarContent />
       </aside>
 
@@ -174,9 +182,10 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 w-72 z-50 shadow-2xl transform transition-transform duration-300 ${
+        className={`md:hidden fixed inset-y-0 left-0 w-72 z-50 transform transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{ boxShadow: '8px 0 40px rgba(0,0,0,0.5)' }}
       >
         <div className="absolute top-3 right-3 z-10">
           <button
@@ -195,7 +204,9 @@ export default function Layout({ children }: LayoutProps) {
         <header
           className="sticky top-0 z-20 px-4 py-3 flex items-center gap-3 md:hidden border-b"
           style={{
-            backgroundColor: 'var(--c-sidebar)',
+            background: 'var(--c-sidebar)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
             borderColor: 'var(--c-sidebar-border)',
           }}
         >
@@ -223,9 +234,11 @@ export default function Layout({ children }: LayoutProps) {
         <header
           className="hidden md:flex sticky top-0 z-20 px-6 py-3 items-center justify-between border-b"
           style={{
-            backgroundColor: 'var(--c-surface)',
-            borderColor: 'var(--c-border)',
-            boxShadow: 'var(--shadow-card)',
+            background: 'var(--glass-bg-strong)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderColor: 'var(--glass-border)',
+            boxShadow: '0 2px 20px rgba(0,0,0,0.25)',
           }}
         >
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--c-text-3)' }}>

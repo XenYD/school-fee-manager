@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 py-8 relative"
-      style={{ backgroundColor: 'var(--c-bg)' }}
+      style={{ backgroundColor: 'transparent' }}
     >
       {/* Theme toggle */}
       <button
@@ -88,9 +88,11 @@ export default function LoginPage() {
         <div
           className="rounded-2xl p-6 sm:p-8"
           style={{
-            backgroundColor: 'var(--c-surface)',
-            border: '1px solid var(--c-border)',
-            boxShadow: 'var(--shadow-xl)',
+            background: 'var(--glass-bg-strong)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,0.08)',
           }}
         >
           <h2 className="text-xl font-semibold mb-6" style={{ color: 'var(--c-text-1)' }}>

@@ -211,6 +211,7 @@ DROP POLICY IF EXISTS "admin_read_all"        ON public.profiles;
 DROP POLICY IF EXISTS "admin_update_profiles" ON public.profiles;
 DROP POLICY IF EXISTS "user_update_own"       ON public.profiles;
 DROP POLICY IF EXISTS "system_insert"         ON public.profiles;
+DROP POLICY IF EXISTS "admin_delete_profiles" ON public.profiles;
 CREATE POLICY "read_own_profile"      ON public.profiles FOR SELECT USING (id = auth.uid());
 CREATE POLICY "admin_read_all"        ON public.profiles FOR SELECT USING (get_my_role() = 'admin');
 CREATE POLICY "admin_update_profiles" ON public.profiles FOR UPDATE
@@ -218,6 +219,8 @@ CREATE POLICY "admin_update_profiles" ON public.profiles FOR UPDATE
 CREATE POLICY "user_update_own"       ON public.profiles FOR UPDATE
   USING (id = auth.uid()) WITH CHECK (id = auth.uid());
 CREATE POLICY "system_insert"         ON public.profiles FOR INSERT WITH CHECK (true);
+CREATE POLICY "admin_delete_profiles" ON public.profiles FOR DELETE
+  USING (get_my_role() = 'admin' AND id <> auth.uid());
 
 -- Students
 DROP POLICY IF EXISTS "admin_all_students"     ON public.students;

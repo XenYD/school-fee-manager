@@ -102,15 +102,16 @@ export default function UsersPage() {
     }
   }
 
-  async function deleteUser(profile: Profile) {
+  async function deleteUser(p: Profile) {
     setDeleting(true)
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from('profiles')
-        .delete()
-        .eq('id', profile.id)
+        .delete({ count: 'exact' })
+        .eq('id', p.id)
       if (error) throw error
-      toast.success(`${profile.full_name} removed`)
+      if (count === 0) throw new Error('Permission denied — run the RLS fix in Supabase (see instructions)')
+      toast.success(`${p.full_name} removed`)
       setConfirmDelete(null)
       loadData(true)
     } catch (err: unknown) {

@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email       TEXT,
   full_name   TEXT NOT NULL DEFAULT 'Unknown',
   role        TEXT NOT NULL DEFAULT 'staff'
-                CHECK (role IN ('admin', 'school_owner', 'staff')),
+                CHECK (role IN ('admin', 'school_owner', 'staff', 'demo')),
   school_id   UUID REFERENCES public.schools(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()

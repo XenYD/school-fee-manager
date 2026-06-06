@@ -511,10 +511,13 @@ export default function SchoolDetailPage() {
           <span>Collection Progress</span>
           <span className="font-semibold text-gray-700">{collectionPct}%</span>
         </div>
-        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-2.5 rounded-full overflow-hidden progress-track">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${collectionPct >= 80 ? 'bg-green-500' : collectionPct >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-            style={{ width: `${collectionPct}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${collectionPct}%`,
+              backgroundColor: collectionPct >= 80 ? 'var(--c-success)' : collectionPct >= 50 ? 'var(--c-warning)' : 'var(--c-danger)',
+            }}
           />
         </div>
       </div>
@@ -531,7 +534,7 @@ export default function SchoolDetailPage() {
           ).map(({ id, label, icon: Icon, count }) => (
             <button key={id} onClick={() => setActiveTab(id)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors ${
-                activeTab === id ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'
+                activeTab === id ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
               <Icon size={14} />
@@ -575,10 +578,14 @@ export default function SchoolDetailPage() {
                 {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"><X size={14} /></button>}
               </div>
 
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+              <div
+                className="flex items-center gap-1 rounded-lg p-1 flex-shrink-0"
+                style={{ backgroundColor: 'var(--c-surface-3)' }}
+              >
                 {(['list', 'grid'] as const).map((v) => (
                   <button key={v} onClick={() => setViewMode(v)}
-                    className={`p-1.5 rounded-md transition-colors ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-gray-400'}`}>
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === v ? 'shadow text-indigo-600' : 'text-gray-400'}`}
+                    style={viewMode === v ? { backgroundColor: 'var(--c-surface)' } : undefined}>
                     {v === 'list' ? <LayoutList size={15} /> : <LayoutGrid size={15} />}
                   </button>
                 ))}
@@ -957,7 +964,13 @@ function AdminFeeRow({ label, feeRecord, dueAmount, periodMonth, periodYear, isP
   const remaining = dueAmount - paid
   const daysOverdue = getDaysOverdue(feeRecord, periodMonth, periodYear)
   return (
-    <div className={`rounded-lg border p-3 ${status === 'paid' ? 'border-green-200 bg-green-50/50' : status === 'partial' ? 'border-amber-200 bg-amber-50/40' : 'border-gray-200 bg-gray-50/50'}`}>
+    <div
+      className="rounded-lg border p-3"
+      style={{
+        borderColor: status === 'paid' ? 'var(--c-success-bg)' : status === 'partial' ? 'var(--c-warning-bg)' : 'var(--c-border)',
+        backgroundColor: status === 'paid' ? 'var(--c-success-bg)' : status === 'partial' ? 'var(--c-warning-bg)' : 'var(--c-surface-2)',
+      }}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap mb-1.5">

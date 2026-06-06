@@ -145,10 +145,10 @@ export default function SchoolDashboard() {
             </div>
           </div>
           <p className="text-3xl font-bold text-gray-900">{collectionRate}%</p>
-          <div className="mt-2 bg-gray-200 rounded-full h-2">
+          <div className="mt-2 rounded-full h-2 progress-track">
             <div
-              className="bg-indigo-500 h-2 rounded-full transition-all"
-              style={{ width: `${collectionRate}%` }}
+              className="h-2 rounded-full transition-all"
+              style={{ width: `${collectionRate}%`, backgroundColor: 'var(--c-accent)' }}
             />
           </div>
         </div>

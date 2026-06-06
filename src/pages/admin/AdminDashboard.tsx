@@ -323,7 +323,7 @@ export default function AdminDashboard() {
                 <Link
                   key={school.id}
                   to={`/admin/schools/${school.id}`}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-colors group"
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-colors group"
                 >
                   <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <SchoolIcon size={18} className="text-indigo-600" />
@@ -343,10 +343,10 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                      <div className="flex-1 rounded-full h-1.5 progress-track">
                         <div
-                          className="bg-green-500 h-1.5 rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
+                          className="h-1.5 rounded-full transition-all"
+                          style={{ width: `${pct}%`, backgroundColor: 'var(--c-success)' }}
                         />
                       </div>
                       <span className="text-xs text-gray-500 flex-shrink-0">{pct}%</span>

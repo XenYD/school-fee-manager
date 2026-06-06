@@ -231,18 +231,23 @@ export default function StudentsPage() {
               </span>
             </div>
             {/* View toggle */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 flex-shrink-0">
+            <div
+              className="flex items-center rounded-lg p-0.5 flex-shrink-0"
+              style={{ backgroundColor: 'var(--c-surface-3)' }}
+            >
               <button
                 onClick={() => setViewMode('list')}
                 title="List view"
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                style={viewMode === 'list' ? { backgroundColor: 'var(--c-surface)' } : undefined}
               >
                 <LayoutList size={15} />
               </button>
               <button
                 onClick={() => setViewMode('grid')}
                 title="Grid view"
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                style={viewMode === 'grid' ? { backgroundColor: 'var(--c-surface)' } : undefined}
               >
                 <LayoutGrid size={15} />
               </button>

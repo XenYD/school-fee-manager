@@ -199,9 +199,12 @@ $$;
 
 -- Schools
 DROP POLICY IF EXISTS "admin_all_schools"           ON public.schools;
+DROP POLICY IF EXISTS "demo_all_schools"            ON public.schools;
 DROP POLICY IF EXISTS "school_user_read_own_school"  ON public.schools;
 CREATE POLICY "admin_all_schools" ON public.schools FOR ALL
   USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "demo_all_schools" ON public.schools FOR SELECT
+  USING (get_my_role() = 'demo');
 CREATE POLICY "school_user_read_own_school" ON public.schools FOR SELECT
   USING (get_my_role() IN ('school_owner', 'staff') AND id = get_my_school_id());
 
@@ -224,27 +227,36 @@ CREATE POLICY "admin_delete_profiles" ON public.profiles FOR DELETE
 
 -- Students
 DROP POLICY IF EXISTS "admin_all_students"     ON public.students;
+DROP POLICY IF EXISTS "demo_all_students"      ON public.students;
 DROP POLICY IF EXISTS "school_manage_students" ON public.students;
 CREATE POLICY "admin_all_students" ON public.students FOR ALL
   USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "demo_all_students" ON public.students FOR ALL
+  USING (get_my_role() = 'demo') WITH CHECK (get_my_role() = 'demo');
 CREATE POLICY "school_manage_students" ON public.students FOR ALL
   USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
   WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());
 
 -- Fee records
 DROP POLICY IF EXISTS "admin_all_fee_records" ON public.fee_records;
+DROP POLICY IF EXISTS "demo_all_fee_records"  ON public.fee_records;
 DROP POLICY IF EXISTS "school_manage_fees"    ON public.fee_records;
 CREATE POLICY "admin_all_fee_records" ON public.fee_records FOR ALL
   USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "demo_all_fee_records" ON public.fee_records FOR ALL
+  USING (get_my_role() = 'demo') WITH CHECK (get_my_role() = 'demo');
 CREATE POLICY "school_manage_fees" ON public.fee_records FOR ALL
   USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
   WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());
 
 -- Payment transactions
-DROP POLICY IF EXISTS "admin_all_transactions"    ON public.payment_transactions;
+DROP POLICY IF EXISTS "admin_all_transactions"     ON public.payment_transactions;
+DROP POLICY IF EXISTS "demo_all_transactions"      ON public.payment_transactions;
 DROP POLICY IF EXISTS "school_manage_transactions" ON public.payment_transactions;
 CREATE POLICY "admin_all_transactions" ON public.payment_transactions FOR ALL
   USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "demo_all_transactions" ON public.payment_transactions FOR ALL
+  USING (get_my_role() = 'demo') WITH CHECK (get_my_role() = 'demo');
 CREATE POLICY "school_manage_transactions" ON public.payment_transactions FOR ALL
   USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
   WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());

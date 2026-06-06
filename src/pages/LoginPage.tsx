@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { BookOpen, Mail, Lock, Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { FeeFlowIcon } from '../components/FeeFlowLogo'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
@@ -69,18 +70,27 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm relative">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #4A90D9, #0F2D52)' }}
-          >
-            <BookOpen size={30} className="text-white" />
+        <div className="flex flex-col items-center mb-8">
+          <FeeFlowIcon size={64} />
+          <div className="flex items-center gap-1.5 mt-4">
+            <span
+              className="font-extrabold"
+              style={{ fontSize: '1.75rem', color: 'var(--c-text-1)', letterSpacing: '-0.02em' }}
+            >
+              Fee
+            </span>
+            <span
+              className="font-extrabold"
+              style={{ fontSize: '1.75rem', color: '#4A90D9', letterSpacing: '-0.02em' }}
+            >
+              Flow
+            </span>
           </div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--c-text-1)' }}>
-            Fee Manager
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--c-text-3)' }}>
-            School Fee Management System
+          <p
+            className="text-xs font-semibold tracking-widest uppercase mt-1"
+            style={{ color: 'var(--c-text-4)' }}
+          >
+            School Fee Management
           </p>
         </div>
 

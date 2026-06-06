@@ -12,10 +12,10 @@ import {
   Menu,
   X,
   ChevronRight,
-  BookOpen,
   Sun,
   Moon,
 } from 'lucide-react'
+import FeeFlowLogo, { FeeFlowIcon } from './FeeFlowLogo'
 import toast from 'react-hot-toast'
 
 interface NavItem {
@@ -83,18 +83,7 @@ export default function Layout({ children }: LayoutProps) {
     >
       {/* Logo */}
       <div className="px-5 py-5 border-b border-[var(--c-sidebar-border)]">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #4A90D9, #357ABD)' }}
-          >
-            <BookOpen size={18} className="text-white" />
-          </div>
-          <div>
-            <p className="font-bold text-white text-sm leading-tight">Fee Manager</p>
-            <p className="text-xs text-[var(--c-sidebar-muted)] leading-tight">School System</p>
-          </div>
-        </div>
+        <FeeFlowLogo size={36} variant="sidebar" />
       </div>
 
       {/* User info */}
@@ -217,13 +206,11 @@ export default function Layout({ children }: LayoutProps) {
             <Menu size={22} />
           </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #4A90D9, #357ABD)' }}
-            >
-              <BookOpen size={14} className="text-white" />
+            <FeeFlowIcon size={28} />
+            <div className="flex items-center gap-1 truncate">
+              <span className="font-extrabold text-white text-sm">Fee</span>
+              <span className="font-extrabold text-sm" style={{ color: '#4A90D9' }}>Flow</span>
             </div>
-            <span className="font-bold text-white text-sm truncate">Fee Manager</span>
           </div>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleBadge.cls}`}>
             {roleBadge.label}

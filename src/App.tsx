@@ -25,7 +25,7 @@ function RootRedirect() {
   if (!user) return <Navigate to="/login" replace />
   if (!profile) return <LoadingSpinner fullPage text="Loading profile..." />
 
-  if (profile.role === 'admin') return <Navigate to="/admin" replace />
+  if (profile.role === 'admin' || profile.role === 'demo') return <Navigate to="/admin" replace />
   return <Navigate to="/school" replace />
 }
 
@@ -37,28 +37,29 @@ function AppRoutes() {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Admin Routes */}
+      {/* Admin + Demo Routes */}
       <Route path="/admin" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'demo']}>
           <Layout>
             <AdminDashboard />
           </Layout>
         </ProtectedRoute>
       } />
       <Route path="/admin/schools" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'demo']}>
           <Layout>
             <SchoolsPage />
           </Layout>
         </ProtectedRoute>
       } />
       <Route path="/admin/schools/:id" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'demo']}>
           <Layout>
             <SchoolDetailPage />
           </Layout>
         </ProtectedRoute>
       } />
+      {/* Admin-only route */}
       <Route path="/admin/users" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <Layout>

@@ -5,7 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import {
   Users, Save, X, Shield, UserCheck, GraduationCap,
   Search, AlertTriangle, Building2, ChevronDown, CheckCircle2,
-  RefreshCw, Info,
+  RefreshCw, Info, Eye,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -13,6 +13,7 @@ const ROLE_CONFIG: Record<UserRole, { label: string; color: string; bg: string; 
   admin:        { label: 'Admin',     color: 'text-purple-700', bg: 'bg-purple-100', icon: <Shield size={13} /> },
   school_owner: { label: 'Principal', color: 'text-blue-700',   bg: 'bg-blue-100',   icon: <UserCheck size={13} /> },
   staff:        { label: 'Staff',     color: 'text-green-700',  bg: 'bg-green-100',  icon: <GraduationCap size={13} /> },
+  demo:         { label: 'Demo',      color: 'text-orange-700', bg: 'bg-orange-100', icon: <Eye size={13} /> },
 }
 
 interface EditState {
@@ -99,7 +100,7 @@ export default function UsersPage() {
     }
   }
 
-  const unassignedCount = profiles.filter((p) => !p.school_id && p.role !== 'admin').length
+  const unassignedCount = profiles.filter((p) => !p.school_id && p.role !== 'admin' && p.role !== 'demo').length
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -199,7 +200,7 @@ export default function UsersPage() {
             const edit = editMap[profile.id]
             const rc = ROLE_CONFIG[profile.role]
             const isSaving = savingId === profile.id
-            const isUnassigned = !profile.school_id && profile.role !== 'admin'
+            const isUnassigned = !profile.school_id && profile.role !== 'admin' && profile.role !== 'demo'
             const dirty = isDirty(profile)
 
             return (
@@ -298,10 +299,12 @@ export default function UsersPage() {
                             ))}
                           </select>
                         </div>
-                        {edit.role === 'admin' && edit.school_id && (
-                          <p className="text-xs text-amber-600 mt-1">Admins can see all schools — school assignment is optional</p>
+                        {(edit.role === 'admin' || edit.role === 'demo') && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            {edit.role === 'demo' ? 'Demo users can browse all schools — no school assignment needed' : 'Admins can see all schools — school assignment is optional'}
+                          </p>
                         )}
-                        {edit.role !== 'admin' && !edit.school_id && (
+                        {edit.role !== 'admin' && edit.role !== 'demo' && !edit.school_id && (
                           <p className="text-xs text-red-500 mt-1">This user won't be able to access any school data</p>
                         )}
                       </div>

@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   if (!profile) return <LoadingSpinner fullPage text="Loading profile..." />
 
   if (allowedRoles && !allowedRoles.includes(profile.role)) {
-    if (profile.role === 'admin') return <Navigate to="/admin" replace />
+    if (profile.role === 'admin' || profile.role === 'demo') return <Navigate to="/admin" replace />
     return <Navigate to="/school" replace />
   }
 

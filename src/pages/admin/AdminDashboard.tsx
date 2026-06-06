@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { School } from '../../types'
+import { useAuth } from '../../context/AuthContext'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { School as SchoolIcon, Users, GraduationCap, TrendingUp, ArrowRight, Plus, RotateCcw, X, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -14,6 +15,8 @@ interface SchoolWithStats extends School {
 }
 
 export default function AdminDashboard() {
+  const { profile } = useAuth()
+  const isDemo = profile?.role === 'demo'
   const [schools, setSchools] = useState<SchoolWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [showReset, setShowReset] = useState(false)
@@ -131,19 +134,21 @@ export default function AdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{monthName} overview</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setShowReset(true); setResetStep('select'); setResetSchoolId('') }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
-          >
-            <RotateCcw size={14} />
-            <span className="hidden sm:inline">Reset Fees</span>
-          </button>
-          <Link to="/admin/schools" className="btn-primary text-sm">
-            <Plus size={16} />
-            <span className="hidden sm:inline">Add School</span>
-          </Link>
-        </div>
+        {!isDemo && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowReset(true); setResetStep('select'); setResetSchoolId('') }}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+            >
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">Reset Fees</span>
+            </button>
+            <Link to="/admin/schools" className="btn-primary text-sm">
+              <Plus size={16} />
+              <span className="hidden sm:inline">Add School</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -309,9 +314,11 @@ export default function AdminDashboard() {
             <SchoolIcon size={40} className="text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">No schools yet</p>
             <p className="text-sm text-gray-400 mt-1">Add your first school to get started</p>
-            <Link to="/admin/schools" className="btn-primary mt-4 text-sm">
-              <Plus size={16} /> Add School
-            </Link>
+            {!isDemo && (
+              <Link to="/admin/schools" className="btn-primary mt-4 text-sm">
+                <Plus size={16} /> Add School
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 import type { School, FeeResetType } from '../../types'
 import { CLASS_LIST } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -30,6 +31,8 @@ const initForm = (): SchoolForm => ({
 })
 
 export default function SchoolsPage() {
+  const { profile } = useAuth()
+  const isDemo = profile?.role === 'demo'
   const [schools, setSchools] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -160,11 +163,13 @@ export default function SchoolsPage() {
             {schools.length} school{schools.length !== 1 ? 's' : ''} registered
           </p>
         </div>
-        <button onClick={openModal} className="btn-primary text-sm">
-          <Plus size={16} />
-          <span className="hidden sm:inline">Add School</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        {!isDemo && (
+          <button onClick={openModal} className="btn-primary text-sm">
+            <Plus size={16} />
+            <span className="hidden sm:inline">Add School</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        )}
       </div>
 
       {/* Schools Grid */}
@@ -173,9 +178,11 @@ export default function SchoolsPage() {
           <SchoolIcon size={48} className="text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 font-medium text-lg">No schools yet</p>
           <p className="text-gray-400 text-sm mt-1">Add your first school to get started</p>
-          <button onClick={openModal} className="btn-primary mt-5 mx-auto">
-            <Plus size={16} /> Add First School
-          </button>
+          {!isDemo && (
+            <button onClick={openModal} className="btn-primary mt-5 mx-auto">
+              <Plus size={16} /> Add First School
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -199,28 +206,30 @@ export default function SchoolsPage() {
                         </p>
                       </div>
                     </div>
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => openEdit(school)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Edit school"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(school)}
-                        disabled={deleting === school.id}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete school"
-                      >
-                        {deleting === school.id ? (
-                          <div className="h-4 w-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
-                        ) : (
-                          <Trash2 size={15} />
-                        )}
-                      </button>
-                    </div>
+                    {/* Action buttons — hidden for demo role */}
+                    {!isDemo && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => openEdit(school)}
+                          className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Edit school"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(school)}
+                          disabled={deleting === school.id}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete school"
+                        >
+                          {deleting === school.id ? (
+                            <div className="h-4 w-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 size={15} />
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-3 space-y-1.5">

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'school_owner' | 'staff'
+export type UserRole = 'admin' | 'school_owner' | 'staff' | 'demo'
 export type PaymentMethod = 'cash' | 'online'
 export type FeeResetType = 'monthly' | 'term'
 export type FeeType = 'school_fee' | 'exam_fee'

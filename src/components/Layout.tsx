@@ -40,19 +40,28 @@ export default function Layout({ children }: LayoutProps) {
     { to: '/admin/users', icon: <Users size={18} />, label: 'Users' },
   ]
 
+  const demoNav: NavItem[] = [
+    { to: '/admin', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { to: '/admin/schools', icon: <School size={18} />, label: 'Schools' },
+  ]
+
   const schoolNav: NavItem[] = [
     { to: '/school', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
     { to: '/school/students', icon: <GraduationCap size={18} />, label: 'Students' },
     { to: '/school/fees', icon: <BadgeDollarSign size={18} />, label: 'Fees' },
   ]
 
-  const navItems = profile?.role === 'admin' ? adminNav : schoolNav
+  const navItems =
+    profile?.role === 'admin' ? adminNav :
+    profile?.role === 'demo'  ? demoNav  :
+    schoolNav
 
-  const roleBadge = {
-    admin: { label: 'Admin', cls: 'bg-purple-500/20 text-purple-200 border border-purple-400/30' },
+  const roleBadge = ({
+    admin:        { label: 'Admin',     cls: 'bg-purple-500/20 text-purple-200 border border-purple-400/30' },
     school_owner: { label: 'Principal', cls: 'bg-blue-500/20 text-blue-200 border border-blue-400/30' },
-    staff: { label: 'Staff', cls: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30' },
-  }[profile?.role ?? 'staff']
+    staff:        { label: 'Staff',     cls: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30' },
+    demo:         { label: 'Demo',      cls: 'bg-orange-500/20 text-orange-200 border border-orange-400/30' },
+  } as Record<string, { label: string; cls: string }>)[profile?.role ?? 'staff'] ?? { label: 'Staff', cls: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30' }
 
   async function handleSignOut() {
     try {

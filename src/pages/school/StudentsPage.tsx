@@ -5,7 +5,7 @@ import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EditFeeModal from '../../components/EditFeeModal'
 import AdmissionFormModal from '../../components/AdmissionFormModal'
-import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, Users } from 'lucide-react'
+import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, Users, X, Phone } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
@@ -20,6 +20,23 @@ export default function StudentsPage() {
   const [editFeeStudent, setEditFeeStudent] = useState<Student | null>(null)
 
   useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
+
+  async function loadStudents() {
+    if (!profile?.school_id) return
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('school_id', profile.school_id)
+        .order('name')
+      if (error) throw error
+      setStudents(data ?? [])
+    } catch {
+      toast.error('Failed to load students')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleDelete(student: Student) {
     if (!confirm(`Remove "${student.name}"? This also removes all their fee records.`)) return

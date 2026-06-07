@@ -283,10 +283,10 @@ export default function AdminDashboard() {
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: 'var(--c-text-1)', fontWeight: 600 }}
-              formatter={(value: number, name: string) => [
-                name === 'collected' ? `Rs ${value.toLocaleString()}` : value,
+              formatter={(value, name) => [
+                name === 'collected' ? `Rs ${Number(value).toLocaleString()}` : value,
                 name === 'collected' ? 'Collected' : 'Defaulters',
-              ]}
+              ] as [string | number, string]}
             />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
             <Bar dataKey="collected" name="Collected" fill="#4A90D9" radius={[3, 3, 0, 0]} />

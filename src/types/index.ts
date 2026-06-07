@@ -3,6 +3,16 @@ export type PaymentMethod = 'cash' | 'online'
 export type FeeResetType = 'monthly' | 'term'
 export type FeeType = 'school_fee' | 'exam_fee'
 export type FeeStatus = 'unpaid' | 'partial' | 'paid'
+export type Gender = 'male' | 'female' | 'other'
+export type ExpenseCategory = 'teacher_salary' | 'rent' | 'utilities' | 'supplies' | 'other'
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  teacher_salary: 'Teacher Salary',
+  rent: 'Rent',
+  utilities: 'Utilities',
+  supplies: 'Supplies',
+  other: 'Other',
+}
 
 export const FEE_TYPE_LABELS: Record<FeeType, string> = {
   school_fee: 'School Fee',
@@ -44,9 +54,37 @@ export interface Student {
   fee_amount: number
   exam_fee_amount: number
   parent_phone: string | null
+  // Extended admission fields
+  date_of_birth: string | null
+  gender: Gender | null
+  admission_date: string | null
+  parent_name: string | null
+  parent_cnic: string | null
+  parent_whatsapp: string | null
+  address: string | null
+  blood_group: string | null
+  religion: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
+  special_needs: string | null
+  previous_school: string | null
+  sibling_ids: string[]
   created_at: string
   updated_at: string
   schools?: School
+}
+
+export interface Expense {
+  id: string
+  school_id: string
+  title: string
+  category: ExpenseCategory
+  amount: number
+  expense_date: string
+  note: string | null
+  created_by: string | null
+  created_at: string
+  profiles?: { full_name: string }
 }
 
 export interface FeeRecord {
@@ -82,6 +120,13 @@ export interface PaymentTransaction {
 export interface StudentWithFee extends Student {
   school_fee_record: FeeRecord | null
   exam_fee_record: FeeRecord | null
+  arrears: number  // total unpaid balance from previous periods
+}
+
+export interface MonthlyTrend {
+  month: string  // e.g. "Jan"
+  collected: number
+  defaulters: number
 }
 
 export interface SchoolStats {

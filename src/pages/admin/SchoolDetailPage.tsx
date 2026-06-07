@@ -11,6 +11,7 @@ import PaymentModal from '../../components/PaymentModal'
 import PaymentHistoryModal from '../../components/PaymentHistoryModal'
 import EditFeeModal from '../../components/EditFeeModal'
 import SetExamFeeModal from '../../components/SetExamFeeModal'
+import AdmissionFormModal from '../../components/AdmissionFormModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { generateReceipt, generateDefaultersReport, generateSummaryReport } from '../../utils/pdf'
 import { exportDefaultersExcel, exportMonthlyReportExcel, parseExcel, downloadExcelTemplate } from '../../utils/excel'
@@ -103,11 +104,29 @@ export default function SchoolDetailPage() {
       const feeMap: Record<string, FeeRecord> = {}
       for (const fr of feeRecords) feeMap[`${fr.student_id}_${fr.fee_type}`] = fr
 
+      // Arrears from previous periods
+      let arrearsMap: Record<string, number> = {}
+      if (ids.length > 0) {
+        const { data: prevData } = await supabase
+          .from('fee_records')
+          .select('student_id, due_amount, paid_amount, status, month, year')
+          .eq('school_id', schoolId)
+          .neq('status', 'paid')
+          .in('student_id', ids)
+        for (const pr of prevData ?? []) {
+          if (pr.year < periodYear || (pr.year === periodYear && pr.month < periodMonth)) {
+            arrearsMap[pr.student_id] = (arrearsMap[pr.student_id] ?? 0) +
+              (Number(pr.due_amount) - Number(pr.paid_amount))
+          }
+        }
+      }
+
       setStudents(
         (studentsData ?? []).map((s) => ({
           ...s,
           school_fee_record: feeMap[`${s.id}_school_fee`] ?? null,
           exam_fee_record: feeMap[`${s.id}_exam_fee`] ?? null,
+          arrears: arrearsMap[s.id] ?? 0,
         }))
       )
     } catch {
@@ -780,56 +799,14 @@ export default function SchoolDetailPage() {
         )}
       </div>
 
-      {/* Add Student Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-              <h3 className="font-semibold text-gray-900">Add Student</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleAddStudent} className="p-5 space-y-4 overflow-y-auto">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Student name" className="input-field" required autoFocus />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Class *</label>
-                <select value={form.class} onChange={(e) => handleClassChange(e.target.value)} className="input-field" required>
-                  <option value="">Select class</option>
-                  {CLASS_LIST.map((c) => <option key={c} value={c}>{c}</option>)}
-                  <option value="other">Other</option>
-                </select>
-                {form.class === 'other' && (
-                  <input type="text" onChange={(e) => setForm({ ...form, class: e.target.value })} placeholder="Enter class name" className="input-field mt-2" />
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">School Fee (Rs)</label>
-                  <input type="number" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })} placeholder="0" className="input-field" min={0} step={1} />
-                  {school?.class_fees?.[form.class] && (
-                    <p className="text-xs text-indigo-500 mt-1">Auto-filled from class config</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Exam Fee (Rs)</label>
-                  <input type="number" value={form.exam_fee_amount} onChange={(e) => setForm({ ...form, exam_fee_amount: e.target.value })} placeholder="0" className="input-field" min={0} step={1} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Parent Phone</label>
-                <input type="tel" value={form.parent_phone} onChange={(e) => setForm({ ...form, parent_phone: e.target.value })} placeholder="03001234567" className="input-field" />
-              </div>
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowAddModal(false)} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" disabled={saving} className="btn-primary flex-1">
-                  {saving ? <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</> : 'Add Student'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Admission Form Modal */}
+      {showAddModal && schoolId && (
+        <AdmissionFormModal
+          schoolId={schoolId}
+          classFees={school?.class_fees}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { setShowAddModal(false); loadData() }}
+        />
       )}
 
       {/* Modals */}
@@ -1031,7 +1008,14 @@ function AdminStudentGridCard({ student, periodMonth, periodYear, processingId, 
           {deleting === student.id ? <div className="h-3 w-3 border border-gray-300 border-t-red-500 rounded-full animate-spin" /> : <Trash2 size={13} />}
         </button>
       </div>
-      {student.parent_phone && <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-500 hover:underline"><Phone size={10} />{student.parent_phone}</a>}
+      <div className="flex items-center gap-2 flex-wrap">
+        {student.parent_phone && <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-500 hover:underline"><Phone size={10} />{student.parent_phone}</a>}
+        {student.arrears > 0 && (
+          <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(231,76,60,0.12)', color: '#E74C3C' }}>
+            Arrears: Rs {student.arrears.toLocaleString()}
+          </span>
+        )}
+      </div>
 
       {Number(student.fee_amount) > 0 && (
         <div className="flex items-center justify-between">

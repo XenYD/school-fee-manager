@@ -92,11 +92,30 @@ export default function FeesPage() {
         feeMap[`${fr.student_id}_${fr.fee_type}`] = fr
       }
 
+      // Arrears: sum unpaid/partial remaining from ALL previous periods
+      let arrearsMap: Record<string, number> = {}
+      if (ids.length > 0) {
+        const { data: prevData } = await supabase
+          .from('fee_records')
+          .select('student_id, due_amount, paid_amount, status, month, year')
+          .eq('school_id', schoolId)
+          .neq('status', 'paid')
+          .in('student_id', ids)
+        for (const pr of prevData ?? []) {
+          // Only count records BEFORE current period
+          if (pr.year < periodYear || (pr.year === periodYear && pr.month < periodMonth)) {
+            arrearsMap[pr.student_id] = (arrearsMap[pr.student_id] ?? 0) +
+              (Number(pr.due_amount) - Number(pr.paid_amount))
+          }
+        }
+      }
+
       setStudents(
         (studentsData ?? []).map((s) => ({
           ...s,
           school_fee_record: feeMap[`${s.id}_school_fee`] ?? null,
           exam_fee_record: feeMap[`${s.id}_exam_fee`] ?? null,
+          arrears: arrearsMap[s.id] ?? 0,
         }))
       )
     } catch {
@@ -1001,6 +1020,12 @@ function StudentFeeCard({
               <a href={`tel:${student.parent_phone}`} className="flex items-center gap-1 text-xs text-indigo-500 hover:underline">
                 <Phone size={10} /> {student.parent_phone}
               </a>
+            )}
+            {student.arrears > 0 && (
+              <span className="flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: 'rgba(231,76,60,0.12)', color: '#E74C3C' }}>
+                Arrears: Rs {student.arrears.toLocaleString()}
+              </span>
             )}
           </div>
         </div>

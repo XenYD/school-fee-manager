@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Sun,
   Moon,
+  Receipt,
+  Phone,
 } from 'lucide-react'
 import FeeFlowLogo, { FeeFlowIcon } from './FeeFlowLogo'
 import toast from 'react-hot-toast'
@@ -37,18 +39,24 @@ export default function Layout({ children }: LayoutProps) {
   const adminNav: NavItem[] = [
     { to: '/admin', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
     { to: '/admin/schools', icon: <School size={18} />, label: 'Schools' },
+    { to: '/admin/expenses', icon: <Receipt size={18} />, label: 'Expenses' },
     { to: '/admin/users', icon: <Users size={18} />, label: 'Users' },
   ]
 
   const demoNav: NavItem[] = [
     { to: '/admin', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
     { to: '/admin/schools', icon: <School size={18} />, label: 'Schools' },
+    { to: '/admin/expenses', icon: <Receipt size={18} />, label: 'Expenses' },
   ]
 
   const schoolNav: NavItem[] = [
     { to: '/school', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
     { to: '/school/students', icon: <GraduationCap size={18} />, label: 'Students' },
     { to: '/school/fees', icon: <BadgeDollarSign size={18} />, label: 'Fees' },
+    ...(profile?.role === 'school_owner'
+      ? [{ to: '/school/expenses', icon: <Receipt size={18} />, label: 'Expenses' }]
+      : []),
+    { to: '/school/contacts', icon: <Phone size={18} />, label: 'Contacts' },
   ]
 
   const navItems =

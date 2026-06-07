@@ -4,73 +4,22 @@ import { supabase } from '../../lib/supabase'
 import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EditFeeModal from '../../components/EditFeeModal'
-import { GraduationCap, Plus, Trash2, X, Search, Phone, ListFilter, LayoutList, LayoutGrid, PenLine } from 'lucide-react'
+import AdmissionFormModal from '../../components/AdmissionFormModal'
+import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
   const { profile } = useAuth()
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
+  const [showAdmission, setShowAdmission] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedClass, setSelectedClass] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [editFeeStudent, setEditFeeStudent] = useState<Student | null>(null)
-  const [form, setForm] = useState({ name: '', class: '', fee_amount: '', exam_fee_amount: '', parent_phone: '' })
 
   useEffect(() => { if (profile?.school_id) loadStudents() }, [profile])
-
-  async function loadStudents() {
-    if (!profile?.school_id) return
-    try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('school_id', profile.school_id)
-        .order('name')
-      if (error) throw error
-      setStudents(data ?? [])
-    } catch {
-      toast.error('Failed to load students')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function handleClassChange(cls: string) {
-    const autoFee = profile?.schools?.class_fees?.[cls]
-    setForm((f) => ({ ...f, class: cls, fee_amount: autoFee ? String(autoFee) : f.fee_amount }))
-  }
-
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.name.trim() || !form.class.trim()) {
-      toast.error('Name and class are required')
-      return
-    }
-    setSaving(true)
-    try {
-      const { error } = await supabase.from('students').insert({
-        school_id: profile?.school_id,
-        name: form.name.trim(),
-        class: form.class.trim(),
-        fee_amount: parseFloat(form.fee_amount) || 0,
-        exam_fee_amount: parseFloat(form.exam_fee_amount) || 0,
-        parent_phone: form.parent_phone.trim() || null,
-      })
-      if (error) throw error
-      toast.success('Student added!')
-      setShowModal(false)
-      setForm({ name: '', class: '', fee_amount: '', exam_fee_amount: '', parent_phone: '' })
-      loadStudents()
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add student')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function handleDelete(student: Student) {
     if (!confirm(`Remove "${student.name}"? This also removes all their fee records.`)) return
@@ -114,10 +63,10 @@ export default function StudentsPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Students</h1>
           <p className="text-sm text-gray-500 mt-0.5">{students.length} enrolled</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary text-sm">
+        <button onClick={() => setShowAdmission(true)} className="btn-primary text-sm">
           <Plus size={16} />
-          <span className="hidden sm:inline">Add Student</span>
-          <span className="sm:hidden">Add</span>
+          <span className="hidden sm:inline">New Admission</span>
+          <span className="sm:hidden">Admit</span>
         </button>
       </div>
 
@@ -196,8 +145,8 @@ export default function StudentsPage() {
           <GraduationCap size={48} className="text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 font-medium text-lg">No students yet</p>
           <p className="text-gray-400 text-sm mt-1">Add your first student to get started</p>
-          <button onClick={() => setShowModal(true)} className="btn-primary mt-5 mx-auto">
-            <Plus size={16} /> Add First Student
+          <button onClick={() => setShowAdmission(true)} className="btn-primary mt-5 mx-auto">
+            <Plus size={16} /> New Admission
           </button>
         </div>
       ) : filtered.length === 0 ? (
@@ -397,59 +346,14 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Add Student Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900 text-lg">Add New Student</h3>
-              <button onClick={() => setShowModal(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleAdd} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Student Name *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Full name" className="input-field" required autoFocus />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Class *</label>
-                <input type="text" value={form.class}
-                  onChange={(e) => handleClassChange(e.target.value)}
-                  placeholder="e.g. Class 5" className="input-field" required />
-                {profile?.schools?.class_fees?.[form.class] && (
-                  <p className="text-xs text-indigo-500 mt-1">Fee auto-filled from class configuration</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">School Fee (Rs)</label>
-                  <input type="number" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })}
-                    placeholder="0" className="input-field" min="0" step="1" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Exam Fee (Rs)</label>
-                  <input type="number" value={form.exam_fee_amount} onChange={(e) => setForm({ ...form, exam_fee_amount: e.target.value })}
-                    placeholder="0" className="input-field" min="0" step="1" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Parent Phone</label>
-                <input type="tel" value={form.parent_phone} onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
-                  placeholder="Optional contact number" className="input-field" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" disabled={saving} className="btn-primary flex-1">
-                  {saving
-                    ? <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-                    : 'Add Student'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Admission Form Modal */}
+      {showAdmission && profile?.school_id && (
+        <AdmissionFormModal
+          schoolId={profile.school_id}
+          classFees={profile.schools?.class_fees}
+          onClose={() => setShowAdmission(false)}
+          onSaved={() => { setShowAdmission(false); loadStudents() }}
+        />
       )}
 
       {/* Edit Fee Modal */}

@@ -17,6 +17,8 @@ import UsersPage from './pages/admin/UsersPage'
 import SchoolDashboard from './pages/school/SchoolDashboard'
 import StudentsPage from './pages/school/StudentsPage'
 import FeesPage from './pages/school/FeesPage'
+import ExpensesPage from './pages/school/ExpensesPage'
+import ContactsPage from './pages/school/ContactsPage'
 
 function RootRedirect() {
   const { user, profile, loading } = useAuth()
@@ -68,26 +70,37 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
+      {/* Admin Expenses */}
+      <Route path="/admin/expenses" element={
+        <ProtectedRoute allowedRoles={['admin', 'demo']}>
+          <Layout><ExpensesPage /></Layout>
+        </ProtectedRoute>
+      } />
+
       {/* School / Staff Routes */}
       <Route path="/school" element={
         <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout>
-            <SchoolDashboard />
-          </Layout>
+          <Layout><SchoolDashboard /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/school/students" element={
         <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout>
-            <StudentsPage />
-          </Layout>
+          <Layout><StudentsPage /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/school/fees" element={
         <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout>
-            <FeesPage />
-          </Layout>
+          <Layout><FeesPage /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/school/expenses" element={
+        <ProtectedRoute allowedRoles={['school_owner']}>
+          <Layout><ExpensesPage /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/school/contacts" element={
+        <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
+          <Layout><ContactsPage /></Layout>
         </ProtectedRoute>
       } />
 

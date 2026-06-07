@@ -73,16 +73,46 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 CREATE TABLE IF NOT EXISTS public.students (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  school_id       UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
-  name            TEXT NOT NULL,
-  class           TEXT NOT NULL,
-  fee_amount      NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (fee_amount >= 0),
-  exam_fee_amount NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (exam_fee_amount >= 0),
-  parent_phone    TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id               UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  name                    TEXT NOT NULL,
+  class                   TEXT NOT NULL,
+  fee_amount              NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (fee_amount >= 0),
+  exam_fee_amount         NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (exam_fee_amount >= 0),
+  parent_phone            TEXT,
+  -- Extended admission fields
+  date_of_birth           DATE,
+  gender                  TEXT CHECK (gender IN ('male','female','other')),
+  admission_date          DATE,
+  parent_name             TEXT,
+  parent_cnic             TEXT,
+  parent_whatsapp         TEXT,
+  address                 TEXT,
+  blood_group             TEXT,
+  religion                TEXT,
+  emergency_contact_name  TEXT,
+  emergency_contact_phone TEXT,
+  special_needs           TEXT,
+  previous_school         TEXT,
+  sibling_ids             UUID[] DEFAULT '{}',
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Expenses
+CREATE TABLE IF NOT EXISTS public.expenses (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id    UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  title        TEXT NOT NULL,
+  category     TEXT NOT NULL DEFAULT 'other'
+                 CHECK (category IN ('teacher_salary','rent','utilities','supplies','other')),
+  amount       NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+  expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  note         TEXT,
+  created_by   UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 
 -- Fee Records — one per student per period per fee type
 CREATE TABLE IF NOT EXISTS public.fee_records (
@@ -260,6 +290,20 @@ CREATE POLICY "demo_all_transactions" ON public.payment_transactions FOR ALL
 CREATE POLICY "school_manage_transactions" ON public.payment_transactions FOR ALL
   USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
   WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());
+
+-- Expenses
+DROP POLICY IF EXISTS "admin_all_expenses"         ON public.expenses;
+DROP POLICY IF EXISTS "demo_read_expenses"         ON public.expenses;
+DROP POLICY IF EXISTS "principal_manage_expenses"  ON public.expenses;
+CREATE POLICY "admin_all_expenses"        ON public.expenses FOR ALL
+  USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "demo_read_expenses"        ON public.expenses FOR SELECT
+  USING (get_my_role() = 'demo');
+CREATE POLICY "principal_manage_expenses" ON public.expenses FOR ALL
+  USING (get_my_role() = 'school_owner' AND school_id = get_my_school_id())
+  WITH CHECK (get_my_role() = 'school_owner' AND school_id = get_my_school_id());
+CREATE POLICY "staff_read_expenses"       ON public.expenses FOR SELECT
+  USING (get_my_role() = 'staff' AND school_id = get_my_school_id());
 
 -- ============================================================
 -- FIRST ADMIN SETUP

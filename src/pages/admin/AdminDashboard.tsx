@@ -4,8 +4,13 @@ import { supabase } from '../../lib/supabase'
 import { School } from '../../types'
 import { useAuth } from '../../context/AuthContext'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { School as SchoolIcon, Users, GraduationCap, TrendingUp, ArrowRight, Plus, RotateCcw, X, AlertTriangle } from 'lucide-react'
+import { School as SchoolIcon, Users, GraduationCap, TrendingUp, ArrowRight, Plus, RotateCcw, X, AlertTriangle, TrendingDown, Receipt } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts'
 import toast from 'react-hot-toast'
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 interface SchoolWithStats extends School {
   student_count: number
@@ -14,10 +19,14 @@ interface SchoolWithStats extends School {
   total_collected: number
 }
 
+interface TrendBar { month: string; collected: number; defaulters: number }
+
 export default function AdminDashboard() {
   const { profile } = useAuth()
   const isDemo = profile?.role === 'demo'
   const [schools, setSchools] = useState<SchoolWithStats[]>([])
+  const [totalExpenses, setTotalExpenses] = useState(0)
+  const [trendData, setTrendData] = useState<TrendBar[]>([])
   const [loading, setLoading] = useState(true)
   const [showReset, setShowReset] = useState(false)
   const [resetSchoolId, setResetSchoolId] = useState('')
@@ -109,6 +118,27 @@ export default function AdminDashboard() {
       )
 
       setSchools(enriched)
+
+      // Expenses total
+      const { data: expData } = await supabase.from('expenses').select('amount')
+      setTotalExpenses((expData ?? []).reduce((s, e) => s + Number(e.amount), 0))
+
+      // Annual trends (all schools)
+      const { data: yearFees } = await supabase
+        .from('fee_records')
+        .select('month, paid_amount, status')
+        .eq('year', currentYear)
+        .eq('fee_type', 'school_fee')
+      const trend: TrendBar[] = MONTH_NAMES.map((m, idx) => {
+        const mn = idx + 1
+        const recs = (yearFees ?? []).filter((r) => r.month === mn)
+        return {
+          month: m,
+          collected: recs.reduce((s, r) => s + Number(r.paid_amount ?? 0), 0),
+          defaulters: recs.filter((r) => r.status !== 'paid').length,
+        }
+      })
+      setTrendData(trend)
     } catch (err) {
       toast.error('Failed to load dashboard data')
       console.error(err)
@@ -200,6 +230,69 @@ export default function AdminDashboard() {
           </p>
           <p className="text-xs text-gray-500 mt-0.5">This month</p>
         </div>
+      </div>
+
+      {/* P/L Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="stat-card">
+          <div className="flex items-center gap-1.5 mb-1">
+            <TrendingUp size={14} className="text-green-500" />
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Collected</p>
+          </div>
+          <p className="text-lg font-bold text-green-600">Rs {totalCollected.toLocaleString()}</p>
+          <p className="text-xs text-gray-400 mt-0.5">This month, all schools</p>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center gap-1.5 mb-1">
+            <TrendingDown size={14} style={{ color: '#E74C3C' }} />
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Expenses</p>
+          </div>
+          <p className="text-lg font-bold" style={{ color: '#E74C3C' }}>Rs {totalExpenses.toLocaleString()}</p>
+          <p className="text-xs text-gray-400 mt-0.5">All time, all schools</p>
+        </div>
+        <div className="stat-card">
+          {(() => {
+            const netPL = totalCollected - totalExpenses
+            const isProfit = netPL >= 0
+            return (
+              <>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Receipt size={14} style={{ color: isProfit ? '#2ECC71' : '#E74C3C' }} />
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    {isProfit ? 'Profit' : 'Loss'}
+                  </p>
+                </div>
+                <p className="text-lg font-bold" style={{ color: isProfit ? '#2ECC71' : '#E74C3C' }}>
+                  Rs {Math.abs(netPL).toLocaleString()}
+                </p>
+              </>
+            )
+          })()}
+        </div>
+      </div>
+
+      {/* Annual Trends Chart */}
+      <div className="card">
+        <h2 className="font-semibold text-gray-900 mb-4">{now.getFullYear()} — Monthly Collection Trend (All Schools)</h2>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={trendData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--c-text-3)' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: 'var(--c-text-4)' }} axisLine={false} tickLine={false}
+              tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+            <Tooltip
+              contentStyle={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: 'var(--c-text-1)', fontWeight: 600 }}
+              formatter={(value: number, name: string) => [
+                name === 'collected' ? `Rs ${value.toLocaleString()}` : value,
+                name === 'collected' ? 'Collected' : 'Defaulters',
+              ]}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+            <Bar dataKey="collected" name="Collected" fill="#4A90D9" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="defaulters" name="Defaulters" fill="#E74C3C" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Reset Fees Modal */}

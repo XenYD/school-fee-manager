@@ -310,19 +310,17 @@ export default function ExpensesPage() {
                 <input className="input-field text-sm" placeholder="e.g. January Staff Salaries"
                   value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Category</label>
-                  <select className="input-field text-sm" value={form.category}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}>
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{EXPENSE_CATEGORY_LABELS[c]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (Rs)</label>
-                  <input type="number" min="1" className="input-field text-sm" placeholder="0"
-                    value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+                <select className="input-field text-sm" value={form.category}
+                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{EXPENSE_CATEGORY_LABELS[c]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (Rs)</label>
+                <input type="number" className="input-field text-sm" placeholder="e.g. 50000"
+                  value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>

@@ -181,95 +181,50 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Schools</span>
-            <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <SchoolIcon size={16} className="text-indigo-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{schools.length}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Total schools</p>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Students</span>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <GraduationCap size={16} className="text-blue-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{totalStudents}</p>
-          <p className="text-xs text-gray-500 mt-0.5">All schools</p>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Collected</span>
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp size={16} className="text-green-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-green-600">
-            {totalCollected.toLocaleString()}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">This month</p>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending</span>
-            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-              <Users size={16} className="text-red-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-red-600">
-            {totalPending.toLocaleString()}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">This month</p>
-        </div>
-      </div>
-
-      {/* P/L Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="stat-card">
-          <div className="flex items-center gap-1.5 mb-1">
-            <TrendingUp size={14} className="text-green-500" />
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Collected</p>
-          </div>
-          <p className="text-lg font-bold text-green-600">Rs {totalCollected.toLocaleString()}</p>
-          <p className="text-xs text-gray-400 mt-0.5">This month, all schools</p>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center gap-1.5 mb-1">
-            <TrendingDown size={14} style={{ color: '#E74C3C' }} />
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Expenses</p>
-          </div>
-          <p className="text-lg font-bold" style={{ color: '#E74C3C' }}>Rs {totalExpenses.toLocaleString()}</p>
-          <p className="text-xs text-gray-400 mt-0.5">All time, all schools</p>
-        </div>
-        <div className="stat-card">
-          {(() => {
-            const netPL = totalCollected - totalExpenses
-            const isProfit = netPL >= 0
-            return (
-              <>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Receipt size={14} style={{ color: isProfit ? '#2ECC71' : '#E74C3C' }} />
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    {isProfit ? 'Profit' : 'Loss'}
-                  </p>
+      {/* Collected / Expenses / P&L */}
+      {(() => {
+        const netPL = totalCollected - totalExpenses
+        const isProfit = netPL >= 0
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="stat-card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Collected</span>
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp size={16} className="text-green-600" />
                 </div>
-                <p className="text-lg font-bold" style={{ color: isProfit ? '#2ECC71' : '#E74C3C' }}>
-                  Rs {Math.abs(netPL).toLocaleString()}
-                </p>
-              </>
-            )
-          })()}
-        </div>
-      </div>
+              </div>
+              <p className="text-2xl font-bold text-green-600">Rs {totalCollected.toLocaleString()}</p>
+              <p className="text-xs text-gray-400 mt-1">This month · all schools</p>
+            </div>
+            <div className="stat-card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Expenses</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(231,76,60,0.12)' }}>
+                  <TrendingDown size={16} style={{ color: '#E74C3C' }} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold" style={{ color: '#E74C3C' }}>Rs {totalExpenses.toLocaleString()}</p>
+              <p className="text-xs text-gray-400 mt-1">All time · all schools</p>
+            </div>
+            <div className="stat-card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {isProfit ? 'Net Profit' : 'Net Loss'}
+                </span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: isProfit ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.12)' }}>
+                  <Receipt size={16} style={{ color: isProfit ? '#2ECC71' : '#E74C3C' }} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold" style={{ color: isProfit ? '#2ECC71' : '#E74C3C' }}>
+                Rs {Math.abs(netPL).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">{isProfit ? 'Profit' : 'Loss'} this period</p>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Annual Trends Chart */}
       <div className="card">
@@ -393,71 +348,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Schools List */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Schools Overview</h2>
-          <Link to="/admin/schools" className="text-sm text-indigo-600 hover:underline font-medium">
-            Manage
-          </Link>
-        </div>
-
-        {schools.length === 0 ? (
-          <div className="text-center py-10">
-            <SchoolIcon size={40} className="text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No schools yet</p>
-            <p className="text-sm text-gray-400 mt-1">Add your first school to get started</p>
-            {!isDemo && (
-              <Link to="/admin/schools" className="btn-primary mt-4 text-sm">
-                <Plus size={16} /> Add School
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {schools.map((school) => {
-              const pct = school.total_expected > 0
-                ? Math.round((school.total_collected / school.total_expected) * 100)
-                : 0
-              return (
-                <Link
-                  key={school.id}
-                  to={`/admin/schools/${school.id}`}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-colors group"
-                >
-                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <SchoolIcon size={18} className="text-indigo-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-semibold text-gray-900 text-sm truncate">{school.name}</p>
-                      <ArrowRight size={14} className="text-gray-400 group-hover:text-indigo-600 flex-shrink-0 ml-2 transition-colors" />
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span>{school.student_count} students</span>
-                      <span>•</span>
-                      <span className="text-green-600 font-medium">{school.paid_count} paid</span>
-                      <span>•</span>
-                      <span className="text-red-500 font-medium">
-                        {school.student_count - school.paid_count} pending
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex-1 rounded-full h-1.5 progress-track">
-                        <div
-                          className="h-1.5 rounded-full transition-all"
-                          style={{ width: `${pct}%`, backgroundColor: 'var(--c-success)' }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-500 flex-shrink-0">{pct}%</span>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { Student, School } from '../../types'
 import { CLASS_LIST } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { Plus, Search, GraduationCap, Phone, Trash2, ListFilter, X } from 'lucide-react'
+import { Plus, Search, GraduationCap, Phone, Trash2, X, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface StudentWithSchool extends Student { school_name?: string }
@@ -156,6 +156,14 @@ export default function AdminStudentsPage() {
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-bold text-gray-900">Rs {Number(student.fee_amount).toLocaleString()}</p>
                 </div>
+                <Link to={`/admin/students/${student.id}`}
+                  className="p-1.5 rounded-lg transition-colors flex-shrink-0"
+                  style={{ color: 'var(--c-text-4)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--c-accent)'; e.currentTarget.style.backgroundColor = 'rgba(74,144,217,0.1)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--c-text-4)'; e.currentTarget.style.backgroundColor = 'transparent' }}
+                  title="View admission record">
+                  <Eye size={14} />
+                </Link>
                 <button onClick={() => handleDelete(student)} disabled={deleting === student.id}
                   className="p-1.5 rounded-lg transition-colors flex-shrink-0 ml-1"
                   style={{ color: 'var(--c-text-4)' }}

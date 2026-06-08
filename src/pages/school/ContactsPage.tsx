@@ -2,8 +2,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import type { Student } from '../../types'
+import { CLASS_LIST } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { Phone, Search, MessageCircle, User, GraduationCap, X } from 'lucide-react'
+import { Phone, Search, MessageCircle, User, GraduationCap, X, ListFilter } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface ContactEntry {
@@ -21,9 +22,10 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<ContactEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterClass, setFilterClass] = useState('')
 
   const schoolId = profile?.role === 'admin' || profile?.role === 'demo'
-    ? null  // admin sees all (could be filtered later)
+    ? null
     : profile?.school_id
 
   useEffect(() => { loadContacts() }, [profile])
@@ -60,15 +62,25 @@ export default function ContactsPage() {
     }
   }
 
+  // Derive available classes from loaded contacts
+  const availableClasses = useMemo(() => {
+    const set = new Set(contacts.map((c) => c.studentClass))
+    return CLASS_LIST.filter((c) => set.has(c))
+  }, [contacts])
+
   const filtered = useMemo(() => {
+    let list = contacts
+    if (filterClass) list = list.filter((c) => c.studentClass === filterClass)
     const q = search.trim().toLowerCase()
-    if (!q) return contacts
-    return contacts.filter((c) =>
-      c.studentName.toLowerCase().includes(q) ||
-      (c.parentName?.toLowerCase().includes(q) ?? false) ||
-      (c.phone?.includes(q) ?? false)
-    )
-  }, [contacts, search])
+    if (q) {
+      list = list.filter((c) =>
+        c.studentName.toLowerCase().includes(q) ||
+        (c.parentName?.toLowerCase().includes(q) ?? false) ||
+        (c.phone?.includes(q) ?? false)
+      )
+    }
+    return list
+  }, [contacts, search, filterClass])
 
   if (loading) return <LoadingSpinner fullPage text="Loading contacts..." />
 
@@ -82,44 +94,82 @@ export default function ContactsPage() {
         </p>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        <input className="input-field pl-9 text-sm" placeholder="Search by student name, parent name or phone..."
-          value={search} onChange={(e) => setSearch(e.target.value)} />
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-            <X size={14} />
-          </button>
-        )}
+      {/* Search + Class filter row */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input className="input-field pl-9 text-sm" placeholder="Search by student name, parent name or phone..."
+            value={search} onChange={(e) => setSearch(e.target.value)} />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <div className="relative sm:w-48">
+          <ListFilter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <select className="input-field text-sm pl-8 appearance-none cursor-pointer"
+            value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
+            <option value="">All Classes</option>
+            {availableClasses.map((c) => {
+              const count = contacts.filter((x) => x.studentClass === c).length
+              return <option key={c} value={c}>{c} ({count})</option>
+            })}
+          </select>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="stat-card text-center">
-          <p className="text-2xl font-bold text-gray-900">{contacts.length}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Total Contacts</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {filterClass ? filtered.length : contacts.length}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">{filterClass ? filterClass : 'Total'} Contacts</p>
         </div>
         <div className="stat-card text-center">
           <p className="text-2xl font-bold" style={{ color: 'var(--c-accent)' }}>
-            {contacts.filter((c) => c.phone).length}
+            {filtered.filter((c) => c.phone).length}
           </p>
           <p className="text-xs text-gray-500 mt-0.5">With Phone</p>
         </div>
         <div className="stat-card text-center">
           <p className="text-2xl font-bold" style={{ color: '#2ECC71' }}>
-            {contacts.filter((c) => c.whatsapp).length}
+            {filtered.filter((c) => c.whatsapp).length}
           </p>
           <p className="text-xs text-gray-500 mt-0.5">On WhatsApp</p>
         </div>
       </div>
+
+      {/* Filter chip */}
+      {(filterClass || search) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {filterClass && (
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium"
+              style={{ backgroundColor: 'rgba(74,144,217,0.12)', color: 'var(--c-accent)' }}>
+              <GraduationCap size={11} /> {filterClass}
+              <button onClick={() => setFilterClass('')} className="ml-0.5 hover:opacity-70"><X size={10} /></button>
+            </span>
+          )}
+          {search && (
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium"
+              style={{ backgroundColor: 'var(--c-surface-3)', color: 'var(--c-text-2)' }}>
+              "{search}"
+              <button onClick={() => setSearch('')} className="ml-0.5 hover:opacity-70"><X size={10} /></button>
+            </span>
+          )}
+          <span className="text-xs" style={{ color: 'var(--c-text-4)' }}>
+            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
 
       {/* Contact List */}
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <Phone size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">
-            {search ? `No contacts match "${search}"` : 'No contacts yet'}
+            {search || filterClass ? 'No contacts match your filters' : 'No contacts yet'}
           </p>
           <p className="text-xs text-gray-400 mt-1">
             Parent contacts are populated from student admission forms
@@ -129,7 +179,6 @@ export default function ContactsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((c) => (
             <div key={c.studentId} className="card hover:shadow-md transition-shadow">
-              {/* Student info */}
               <div className="flex items-center gap-2 mb-3 pb-2.5 border-b" style={{ borderColor: 'var(--c-border)' }}>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, var(--c-accent), #2C5F8A)' }}>
@@ -143,7 +192,6 @@ export default function ContactsPage() {
                 </div>
               </div>
 
-              {/* Parent info */}
               <div className="space-y-1.5">
                 {c.parentName && (
                   <div className="flex items-center gap-2">
@@ -152,8 +200,7 @@ export default function ContactsPage() {
                   </div>
                 )}
                 {c.phone && (
-                  <a href={`tel:${c.phone}`}
-                    className="flex items-center gap-2 group">
+                  <a href={`tel:${c.phone}`} className="flex items-center gap-2 group">
                     <Phone size={13} style={{ color: 'var(--c-accent)' }} className="flex-shrink-0" />
                     <span className="text-sm font-medium group-hover:underline" style={{ color: 'var(--c-accent)' }}>
                       {c.phone}
@@ -162,8 +209,7 @@ export default function ContactsPage() {
                 )}
                 {c.whatsapp && c.whatsapp !== c.phone && (
                   <a href={`https://wa.me/${c.whatsapp.replace(/\D/g, '')}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 group">
+                    target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 group">
                     <MessageCircle size={13} style={{ color: '#2ECC71' }} className="flex-shrink-0" />
                     <span className="text-sm font-medium group-hover:underline" style={{ color: '#2ECC71' }}>
                       {c.whatsapp}

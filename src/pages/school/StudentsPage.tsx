@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EditFeeModal from '../../components/EditFeeModal'
-import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, X, Phone } from 'lucide-react'
+import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, X, Phone, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
@@ -268,6 +268,13 @@ export default function StudentsPage() {
                       </td>
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Link
+                            to={`/school/students/${student.id}`}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View admission record"
+                          >
+                            <Eye size={14} />
+                          </Link>
                           <button
                             onClick={() => setEditFeeStudent(student)}
                             className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -303,6 +310,11 @@ export default function StudentsPage() {
                 >
                   {/* Action buttons */}
                   <div className="absolute top-2 right-2 flex items-center gap-0.5">
+                    <Link to={`/school/students/${student.id}`}
+                      className="p-1 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="View admission record">
+                      <Eye size={12} />
+                    </Link>
                     <button
                       onClick={() => setEditFeeStudent(student)}
                       className="p-1 text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"

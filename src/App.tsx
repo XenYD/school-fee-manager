@@ -28,6 +28,7 @@ import ContactsPage from './pages/school/ContactsPage'
 // Shared pages
 import AddExpensePage from './pages/shared/AddExpensePage'
 import NewAdmissionPage from './pages/shared/NewAdmissionPage'
+import StudentProfilePage from './pages/shared/StudentProfilePage'
 
 function RootRedirect() {
   const { user, profile, loading } = useAuth()
@@ -61,12 +62,14 @@ function AppRoutes() {
       <Route path="/admin/expenses/new" element={<ProtectedRoute allowedRoles={['admin']}><W><AddExpensePage /></W></ProtectedRoute>} />
       <Route path="/admin/students" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><AdminStudentsPage /></W></ProtectedRoute>} />
       <Route path="/admin/students/new" element={<ProtectedRoute allowedRoles={['admin']}><W><NewAdmissionPage /></W></ProtectedRoute>} />
+      <Route path="/admin/students/:id" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><StudentProfilePage /></W></ProtectedRoute>} />
 
       {/* ── School / Staff ── */}
       <Route path="/school" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><SchoolDashboard /></W></ProtectedRoute>} />
       <Route path="/school/fees" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><FeesPage /></W></ProtectedRoute>} />
       <Route path="/school/students" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><StudentsPage /></W></ProtectedRoute>} />
       <Route path="/school/students/new" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><NewAdmissionPage /></W></ProtectedRoute>} />
+      <Route path="/school/students/:id" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><StudentProfilePage /></W></ProtectedRoute>} />
       <Route path="/school/contacts" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><ContactsPage /></W></ProtectedRoute>} />
       <Route path="/school/expenses" element={<ProtectedRoute allowedRoles={['school_owner']}><W><ExpensesPage /></W></ProtectedRoute>} />
       <Route path="/school/expenses/new" element={<ProtectedRoute allowedRoles={['school_owner']}><W><AddExpensePage /></W></ProtectedRoute>} />

@@ -147,10 +147,6 @@ export default function UsersPage() {
             Assign roles and schools to everyone who signs up
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/admin/users/new" className="btn-primary text-sm inline-flex items-center gap-1.5">
-            <UserPlus size={15} /> Add User
-          </Link>
         <button
           onClick={() => loadData(true)}
           disabled={refreshing}
@@ -160,7 +156,6 @@ export default function UsersPage() {
           <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
           <span className="hidden sm:inline">Refresh</span>
         </button>
-        </div>
       </div>
 
       {/* Info Banner */}

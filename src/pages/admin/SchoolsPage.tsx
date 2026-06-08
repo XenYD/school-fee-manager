@@ -163,13 +163,6 @@ export default function SchoolsPage() {
             {schools.length} school{schools.length !== 1 ? 's' : ''} registered
           </p>
         </div>
-        {!isDemo && (
-          <Link to="/admin/schools/new" className="btn-primary text-sm inline-flex items-center gap-1.5">
-            <Plus size={16} />
-            <span className="hidden sm:inline">Add School</span>
-            <span className="sm:hidden">Add</span>
-          </Link>
-        )}
       </div>
 
       {/* Schools Grid */}

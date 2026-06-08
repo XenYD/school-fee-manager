@@ -125,11 +125,6 @@ export default function ExpensesPage() {
             {currentSchool?.name ?? 'All Schools'}
           </p>
         </div>
-        {canManage && (
-          <Link to={addPath} className="btn-primary text-sm inline-flex items-center gap-1.5">
-            <Plus size={15} /> Add Expense
-          </Link>
-        )}
       </div>
 
       {/* Admin school selector */}

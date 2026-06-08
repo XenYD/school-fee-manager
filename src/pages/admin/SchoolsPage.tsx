@@ -164,11 +164,11 @@ export default function SchoolsPage() {
           </p>
         </div>
         {!isDemo && (
-          <button onClick={openModal} className="btn-primary text-sm">
+          <Link to="/admin/schools/new" className="btn-primary text-sm inline-flex items-center gap-1.5">
             <Plus size={16} />
             <span className="hidden sm:inline">Add School</span>
             <span className="sm:hidden">Add</span>
-          </button>
+          </Link>
         )}
       </div>
 

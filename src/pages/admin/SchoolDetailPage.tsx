@@ -484,11 +484,11 @@ export default function SchoolDetailPage() {
           <button onClick={() => downloadExcelTemplate()} className="btn-secondary text-xs py-2" title="Download template">
             <Download size={13} />
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs py-2">
+          <Link to="/admin/students/new" className="btn-primary text-xs py-2 inline-flex items-center gap-1.5">
             <Plus size={14} />
             <span className="hidden sm:inline">Add Student</span>
             <span className="sm:hidden">Add</span>
-          </button>
+          </Link>
         </div>
       </div>
 

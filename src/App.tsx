@@ -9,26 +9,37 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
+// Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
 import SchoolsPage from './pages/admin/SchoolsPage'
+import AddSchoolPage from './pages/admin/AddSchoolPage'
 import SchoolDetailPage from './pages/admin/SchoolDetailPage'
 import UsersPage from './pages/admin/UsersPage'
+import AddUserPage from './pages/admin/AddUserPage'
+import AdminStudentsPage from './pages/admin/AdminStudentsPage'
 
+// School pages
 import SchoolDashboard from './pages/school/SchoolDashboard'
 import StudentsPage from './pages/school/StudentsPage'
 import FeesPage from './pages/school/FeesPage'
 import ExpensesPage from './pages/school/ExpensesPage'
 import ContactsPage from './pages/school/ContactsPage'
 
+// Shared pages
+import AddExpensePage from './pages/shared/AddExpensePage'
+import NewAdmissionPage from './pages/shared/NewAdmissionPage'
+
 function RootRedirect() {
   const { user, profile, loading } = useAuth()
-
   if (loading) return <LoadingSpinner fullPage text="Loading..." />
   if (!user) return <Navigate to="/login" replace />
   if (!profile) return <LoadingSpinner fullPage text="Loading profile..." />
-
   if (profile.role === 'admin' || profile.role === 'demo') return <Navigate to="/admin" replace />
   return <Navigate to="/school" replace />
+}
+
+function W({ children }: { children: React.ReactNode }) {
+  return <Layout>{children}</Layout>
 }
 
 function AppRoutes() {
@@ -39,70 +50,26 @@ function AppRoutes() {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Admin + Demo Routes */}
-      <Route path="/admin" element={
-        <ProtectedRoute allowedRoles={['admin', 'demo']}>
-          <Layout>
-            <AdminDashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/admin/schools" element={
-        <ProtectedRoute allowedRoles={['admin', 'demo']}>
-          <Layout>
-            <SchoolsPage />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/admin/schools/:id" element={
-        <ProtectedRoute allowedRoles={['admin', 'demo']}>
-          <Layout>
-            <SchoolDetailPage />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      {/* Admin-only route */}
-      <Route path="/admin/users" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <Layout>
-            <UsersPage />
-          </Layout>
-        </ProtectedRoute>
-      } />
+      {/* ── Admin + Demo ── */}
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><AdminDashboard /></W></ProtectedRoute>} />
+      <Route path="/admin/schools" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><SchoolsPage /></W></ProtectedRoute>} />
+      <Route path="/admin/schools/new" element={<ProtectedRoute allowedRoles={['admin']}><W><AddSchoolPage /></W></ProtectedRoute>} />
+      <Route path="/admin/schools/:id" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><SchoolDetailPage /></W></ProtectedRoute>} />
+      <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><W><UsersPage /></W></ProtectedRoute>} />
+      <Route path="/admin/users/new" element={<ProtectedRoute allowedRoles={['admin']}><W><AddUserPage /></W></ProtectedRoute>} />
+      <Route path="/admin/expenses" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><ExpensesPage /></W></ProtectedRoute>} />
+      <Route path="/admin/expenses/new" element={<ProtectedRoute allowedRoles={['admin']}><W><AddExpensePage /></W></ProtectedRoute>} />
+      <Route path="/admin/students" element={<ProtectedRoute allowedRoles={['admin','demo']}><W><AdminStudentsPage /></W></ProtectedRoute>} />
+      <Route path="/admin/students/new" element={<ProtectedRoute allowedRoles={['admin']}><W><NewAdmissionPage /></W></ProtectedRoute>} />
 
-      {/* Admin Expenses */}
-      <Route path="/admin/expenses" element={
-        <ProtectedRoute allowedRoles={['admin', 'demo']}>
-          <Layout><ExpensesPage /></Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* School / Staff Routes */}
-      <Route path="/school" element={
-        <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout><SchoolDashboard /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/school/students" element={
-        <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout><StudentsPage /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/school/fees" element={
-        <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout><FeesPage /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/school/expenses" element={
-        <ProtectedRoute allowedRoles={['school_owner']}>
-          <Layout><ExpensesPage /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/school/contacts" element={
-        <ProtectedRoute allowedRoles={['school_owner', 'staff']}>
-          <Layout><ContactsPage /></Layout>
-        </ProtectedRoute>
-      } />
+      {/* ── School / Staff ── */}
+      <Route path="/school" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><SchoolDashboard /></W></ProtectedRoute>} />
+      <Route path="/school/fees" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><FeesPage /></W></ProtectedRoute>} />
+      <Route path="/school/students" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><StudentsPage /></W></ProtectedRoute>} />
+      <Route path="/school/students/new" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><NewAdmissionPage /></W></ProtectedRoute>} />
+      <Route path="/school/contacts" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><ContactsPage /></W></ProtectedRoute>} />
+      <Route path="/school/expenses" element={<ProtectedRoute allowedRoles={['school_owner']}><W><ExpensesPage /></W></ProtectedRoute>} />
+      <Route path="/school/expenses/new" element={<ProtectedRoute allowedRoles={['school_owner']}><W><AddExpensePage /></W></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

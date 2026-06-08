@@ -4,8 +4,9 @@ import { supabase } from '../../lib/supabase'
 import type { Expense, ExpenseCategory, School } from '../../types'
 import { EXPENSE_CATEGORY_LABELS } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import { Link } from 'react-router-dom'
 import {
-  Plus, X, Trash2, Receipt, TrendingDown, DollarSign,
+  Plus, Trash2, Receipt, TrendingDown,
   Search, CalendarDays, Tag,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -32,20 +33,11 @@ export default function ExpensesPage() {
   const [schools, setSchools] = useState<SchoolOption[]>([])
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>(profile?.school_id ?? '')
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<ExpenseCategory | ''>('')
 
-  const initForm = () => ({
-    title: '',
-    category: 'other' as ExpenseCategory,
-    amount: '',
-    expense_date: new Date().toISOString().slice(0, 10),
-    note: '',
-  })
-  const [form, setForm] = useState(initForm())
+  const addPath = isAdmin ? '/admin/expenses/new' : '/school/expenses/new'
 
   useEffect(() => {
     if (isAdmin) loadSchools()
@@ -79,32 +71,6 @@ export default function ExpensesPage() {
       toast.error('Failed to load expenses')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.title.trim() || !form.amount) { toast.error('Title and amount are required'); return }
-    setSaving(true)
-    try {
-      const { error } = await supabase.from('expenses').insert({
-        school_id: selectedSchoolId,
-        title: form.title.trim(),
-        category: form.category,
-        amount: parseFloat(form.amount),
-        expense_date: form.expense_date,
-        note: form.note.trim() || null,
-        created_by: profile?.id,
-      })
-      if (error) throw error
-      toast.success('Expense added')
-      setShowModal(false)
-      setForm(initForm())
-      loadExpenses()
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -160,9 +126,9 @@ export default function ExpensesPage() {
           </p>
         </div>
         {canManage && (
-          <button onClick={() => setShowModal(true)} className="btn-primary text-sm">
+          <Link to={addPath} className="btn-primary text-sm inline-flex items-center gap-1.5">
             <Plus size={15} /> Add Expense
-          </button>
+          </Link>
         )}
       </div>
 
@@ -230,9 +196,9 @@ export default function ExpensesPage() {
           <Receipt size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">No expenses recorded</p>
           {canManage && (
-            <button onClick={() => setShowModal(true)} className="btn-primary mt-4 mx-auto text-sm">
+            <Link to={addPath} className="btn-primary mt-4 mx-auto text-sm inline-flex items-center gap-1.5">
               <Plus size={14} /> Add First Expense
-            </button>
+            </Link>
           )}
         </div>
       ) : (
@@ -293,58 +259,6 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      {/* Add Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="modal-box w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Add Expense</h3>
-              <button onClick={() => { setShowModal(false); setForm(initForm()) }}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleSave} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Title</label>
-                <input className="input-field text-sm" placeholder="e.g. January Staff Salaries"
-                  value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Category</label>
-                <select className="input-field text-sm" value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{EXPENSE_CATEGORY_LABELS[c]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (Rs)</label>
-                <input type="number" className="input-field text-sm" placeholder="e.g. 50000"
-                  value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
-                <input type="date" className="input-field text-sm" value={form.expense_date}
-                  onChange={(e) => setForm((f) => ({ ...f, expense_date: e.target.value }))} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Note (optional)</label>
-                <input className="input-field text-sm" placeholder="Any notes..."
-                  value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={() => { setShowModal(false); setForm(initForm()) }}
-                  className="btn-secondary text-sm flex-1"><X size={14} /> Cancel</button>
-                <button type="submit" disabled={saving} className="btn-primary text-sm flex-1">
-                  {saving
-                    ? <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-                    : <><DollarSign size={14} /> Save</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

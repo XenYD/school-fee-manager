@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { Link } from 'react-router-dom'
 import { Student } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EditFeeModal from '../../components/EditFeeModal'
-import AdmissionFormModal from '../../components/AdmissionFormModal'
-import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, Users, X, Phone } from 'lucide-react'
+import { GraduationCap, Plus, Trash2, Search, ListFilter, LayoutList, LayoutGrid, PenLine, X, Phone } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
   const { profile } = useAuth()
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAdmission, setShowAdmission] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedClass, setSelectedClass] = useState('')
@@ -80,11 +79,11 @@ export default function StudentsPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Students</h1>
           <p className="text-sm text-gray-500 mt-0.5">{students.length} enrolled</p>
         </div>
-        <button onClick={() => setShowAdmission(true)} className="btn-primary text-sm">
+        <Link to="/school/students/new" className="btn-primary text-sm inline-flex items-center gap-1.5">
           <Plus size={16} />
           <span className="hidden sm:inline">New Admission</span>
           <span className="sm:hidden">Admit</span>
-        </button>
+        </Link>
       </div>
 
       {/* Filters row — only when there are students */}
@@ -162,9 +161,9 @@ export default function StudentsPage() {
           <GraduationCap size={48} className="text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 font-medium text-lg">No students yet</p>
           <p className="text-gray-400 text-sm mt-1">Add your first student to get started</p>
-          <button onClick={() => setShowAdmission(true)} className="btn-primary mt-5 mx-auto">
+          <Link to="/school/students/new" className="btn-primary mt-5 mx-auto inline-flex items-center gap-1.5">
             <Plus size={16} /> New Admission
-          </button>
+          </Link>
         </div>
       ) : filtered.length === 0 ? (
         <div className="card text-center py-8">
@@ -361,16 +360,6 @@ export default function StudentsPage() {
             {(classRevenue ?? totalMonthlyRevenue).toLocaleString()}
           </span>
         </div>
-      )}
-
-      {/* Admission Form Modal */}
-      {showAdmission && profile?.school_id && (
-        <AdmissionFormModal
-          schoolId={profile.school_id}
-          classFees={profile.schools?.class_fees}
-          onClose={() => setShowAdmission(false)}
-          onSaved={() => { setShowAdmission(false); loadStudents() }}
-        />
       )}
 
       {/* Edit Fee Modal */}

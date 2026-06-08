@@ -62,7 +62,7 @@ export default function ExpensesPage() {
     try {
       const { data, error } = await supabase
         .from('expenses')
-        .select('*, profiles(full_name)')
+        .select('*, profiles!created_by(full_name), staff_member:profiles!staff_member_id(full_name)')
         .eq('school_id', selectedSchoolId)
         .order('expense_date', { ascending: false })
       if (error) throw error
@@ -215,6 +215,16 @@ export default function ExpensesPage() {
                       style={{ backgroundColor: CATEGORY_COLORS[exp.category] + '18', color: CATEGORY_COLORS[exp.category] }}>
                       {EXPENSE_CATEGORY_LABELS[exp.category]}
                     </span>
+                    {/* Staff member badge — only for teacher salary */}
+                    {exp.category === 'teacher_salary' && exp.staff_member?.full_name && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-1"
+                        style={{ backgroundColor: 'rgba(74,144,217,0.12)', color: '#4A90D9' }}>
+                        <span className="w-3.5 h-3.5 rounded-full bg-[#4A90D9] text-white flex items-center justify-center text-[8px] font-bold leading-none flex-shrink-0">
+                          {exp.staff_member.full_name.charAt(0)}
+                        </span>
+                        {exp.staff_member.full_name}
+                      </span>
+                    )}
                     <span className="text-xs text-gray-400 flex items-center gap-1">
                       <CalendarDays size={11} />
                       {new Date(exp.expense_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -227,7 +237,7 @@ export default function ExpensesPage() {
                     Rs {Number(exp.amount).toLocaleString()}
                   </p>
                   {exp.profiles && (
-                    <p className="text-xs text-gray-400 mt-0.5">{exp.profiles.full_name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">by {exp.profiles.full_name}</p>
                   )}
                 </div>
                 {canManage && (

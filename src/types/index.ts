@@ -83,8 +83,10 @@ export interface Expense {
   expense_date: string
   note: string | null
   created_by: string | null
+  staff_member_id: string | null
   created_at: string
   profiles?: { full_name: string }
+  staff_member?: { full_name: string }
 }
 
 export interface FeeRecord {

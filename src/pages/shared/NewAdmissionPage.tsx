@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import type { Student, Gender, School } from '../../types'
 import { CLASS_LIST } from '../../types'
 import {
   ArrowLeft, ArrowRight, Check, User, Phone, BookOpen,
-  Users, Search, ChevronLeft,
+  Users, Search, ChevronLeft, CheckCircle2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -533,15 +533,29 @@ function Step3({ form, setField, existingStudents, sibSearch, setSibSearch, sibC
 export default function NewAdmissionPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const isAdmin = profile?.role === 'admin'
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<FormData>(initForm())
+  const [form, setForm] = useState<FormData>(() => {
+    const inquiry = location.state?.inquiry
+    if (inquiry) {
+      return {
+        ...initForm(),
+        name: inquiry.name ?? '',
+        parent_name: inquiry.parent_name ?? '',
+        parent_phone: inquiry.parent_phone ?? '',
+        studentClass: inquiry.studentClass ?? '',
+      }
+    }
+    return initForm()
+  })
   const [existingStudents, setExistingStudents] = useState<Student[]>([])
   const [schools, setSchools] = useState<School[]>([])
   const [selectedSchoolId, setSelectedSchoolId] = useState(profile?.school_id ?? '')
   const [sibSearch, setSibSearch] = useState('')
   const [sibClass, setSibClass] = useState('')
+  const fromInquiry = location.state?.inquiry ?? null
 
   const schoolId = isAdmin ? selectedSchoolId : (profile?.school_id ?? '')
   const classFees = isAdmin
@@ -650,6 +664,14 @@ export default function NewAdmissionPage() {
         }
       }
 
+      // If converted from an inquiry, mark it as converted
+      if (fromInquiry?.inquiry_id) {
+        await supabase
+          .from('inquiries')
+          .update({ status: 'converted' })
+          .eq('id', fromInquiry.inquiry_id)
+      }
+
       toast.success(`${form.name} admitted successfully!`)
       navigate(backPath)
     } catch (err: unknown) {
@@ -682,6 +704,18 @@ export default function NewAdmissionPage() {
           </p>
         </div>
       </div>
+
+      {fromInquiry && (
+        <div
+          className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
+          style={{ backgroundColor: 'rgba(5,150,105,0.1)', color: '#059669' }}
+        >
+          <CheckCircle2 size={16} />
+          <span>
+            Pre-filled from inquiry for <strong>{fromInquiry.name}</strong>. Complete remaining fields to admit.
+          </span>
+        </div>
+      )}
 
       <StepIndicator step={step} />
 

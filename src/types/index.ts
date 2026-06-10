@@ -5,6 +5,10 @@ export type FeeType = 'school_fee' | 'exam_fee'
 export type FeeStatus = 'unpaid' | 'partial' | 'paid'
 export type Gender = 'male' | 'female' | 'other'
 export type ExpenseCategory = 'teacher_salary' | 'rent' | 'utilities' | 'supplies' | 'other'
+export type StudentStatus = 'active' | 'graduated'
+export type InquiryStatus = 'new' | 'follow_up' | 'converted'
+export type InvoiceStatus = 'pending' | 'paid' | 'cancelled'
+export type AssessmentType = 'monthly_test' | 'mid_term' | 'terminal'
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   teacher_salary: 'Teacher Salary',
@@ -23,6 +27,44 @@ export const CLASS_LIST = [
   'Class 1','Class 2','Class 3','Class 4','Class 5',
   'Class 6','Class 7','Class 8','Class 9','Class 10',
 ]
+
+export const ASSESSMENT_TYPE_LABELS: Record<AssessmentType, string> = {
+  monthly_test: 'Monthly Test',
+  mid_term: 'Mid Term Exam',
+  terminal: 'Terminal Exam',
+}
+
+export const INQUIRY_STATUS_LABELS: Record<InquiryStatus, string> = {
+  new: 'New',
+  follow_up: 'Follow Up',
+  converted: 'Converted',
+}
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  pending: 'Pending',
+  paid: 'Paid',
+  cancelled: 'Cancelled',
+}
+
+export function getGrade(percentage: number): string {
+  if (percentage >= 90) return 'A+'
+  if (percentage >= 80) return 'A'
+  if (percentage >= 70) return 'B'
+  if (percentage >= 60) return 'C'
+  if (percentage >= 50) return 'D'
+  return 'Fail'
+}
+
+export function getGradeColor(grade: string): string {
+  switch (grade) {
+    case 'A+': return '#059669'
+    case 'A':  return '#10B981'
+    case 'B':  return '#3B82F6'
+    case 'C':  return '#F59E0B'
+    case 'D':  return '#F97316'
+    default:   return '#EF4444'
+  }
+}
 
 export interface School {
   id: string
@@ -53,6 +95,7 @@ export interface Student {
   class: string
   fee_amount: number
   exam_fee_amount: number
+  status: StudentStatus
   parent_phone: string | null
   // Extended admission fields
   date_of_birth: string | null
@@ -114,9 +157,76 @@ export interface PaymentTransaction {
   payment_method: PaymentMethod
   paid_by: string | null
   notes: string | null
+  is_cancelled: boolean
+  cancelled_reason: string | null
+  cancelled_by: string | null
+  cancelled_at: string | null
   created_at: string
   updated_at: string
   profiles?: { full_name: string }
+}
+
+export interface Inquiry {
+  id: string
+  school_id: string
+  student_name: string
+  parent_name: string
+  parent_phone: string
+  class_interested: string
+  notes: string | null
+  status: InquiryStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface FeeInvoice {
+  id: string
+  school_id: string
+  student_id: string
+  invoice_number: string
+  month: number
+  year: number
+  fee_amount: number
+  exam_fee_amount: number
+  total_amount: number
+  due_date: string
+  status: InvoiceStatus
+  cancelled_reason: string | null
+  cancelled_by: string | null
+  cancelled_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  students?: { name: string; class: string }
+  profiles?: { full_name: string }
+  cancelled_by_profile?: { full_name: string }
+}
+
+export interface Assessment {
+  id: string
+  school_id: string
+  type: AssessmentType
+  name: string
+  class: string
+  date: string
+  subjects: string[]
+  total_marks: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AssessmentResult {
+  id: string
+  assessment_id: string
+  student_id: string
+  school_id: string
+  subject: string
+  marks_obtained: number
+  total_marks: number
+  created_at: string
+  updated_at: string
+  students?: { name: string; class: string }
 }
 
 export interface StudentWithFee extends Student {

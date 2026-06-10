@@ -311,3 +311,167 @@ CREATE POLICY "staff_read_expenses"       ON public.expenses FOR SELECT
 -- UPDATE public.profiles SET role = 'admin', school_id = NULL
 -- WHERE email = 'your-email@example.com';
 -- ============================================================
+
+-- ============================================================
+-- v3 MIGRATION: Promotions, Inquiries, Invoices, Assessments
+-- Run these ALTER TABLE statements first on existing databases:
+-- ============================================================
+--
+-- ALTER TABLE public.students
+--   ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
+--     CHECK (status IN ('active', 'graduated'));
+--
+-- ALTER TABLE public.payment_transactions
+--   ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT false,
+--   ADD COLUMN IF NOT EXISTS cancelled_reason TEXT,
+--   ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+--   ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+--
+-- ============================================================
+
+-- Student status for graduation tracking
+ALTER TABLE public.students
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'graduated'));
+
+-- Payment transaction cancellation fields
+ALTER TABLE public.payment_transactions
+  ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS cancelled_reason TEXT,
+  ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+
+-- ============================================================
+-- NEW TABLES
+-- ============================================================
+
+-- Inquiries — pre-admission leads
+CREATE TABLE IF NOT EXISTS public.inquiries (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id        UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  student_name     TEXT NOT NULL,
+  parent_name      TEXT NOT NULL,
+  parent_phone     TEXT NOT NULL,
+  class_interested TEXT NOT NULL,
+  notes            TEXT,
+  status           TEXT NOT NULL DEFAULT 'new'
+                     CHECK (status IN ('new', 'follow_up', 'converted')),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE TRIGGER on_inquiries_updated
+  BEFORE UPDATE ON public.inquiries FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Fee Invoices
+CREATE TABLE IF NOT EXISTS public.fee_invoices (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id        UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  student_id       UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  invoice_number   TEXT NOT NULL,
+  month            INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+  year             INTEGER NOT NULL CHECK (year >= 2000),
+  fee_amount       NUMERIC(10,2) NOT NULL DEFAULT 0,
+  exam_fee_amount  NUMERIC(10,2) NOT NULL DEFAULT 0,
+  total_amount     NUMERIC(10,2) NOT NULL DEFAULT 0,
+  due_date         DATE NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'paid', 'cancelled')),
+  cancelled_reason TEXT,
+  cancelled_by     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  cancelled_at     TIMESTAMPTZ,
+  created_by       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.fee_invoices ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE TRIGGER on_fee_invoices_updated
+  BEFORE UPDATE ON public.fee_invoices FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Assessments
+CREATE TABLE IF NOT EXISTS public.assessments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id       UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  type            TEXT NOT NULL CHECK (type IN ('monthly_test', 'mid_term', 'terminal')),
+  name            TEXT NOT NULL,
+  class           TEXT NOT NULL,
+  date            DATE NOT NULL,
+  subjects        TEXT[] NOT NULL DEFAULT '{}',
+  total_marks     NUMERIC(6,2) NOT NULL DEFAULT 100 CHECK (total_marks > 0),
+  created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.assessments ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE TRIGGER on_assessments_updated
+  BEFORE UPDATE ON public.assessments FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Assessment Results
+CREATE TABLE IF NOT EXISTS public.assessment_results (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assessment_id   UUID NOT NULL REFERENCES public.assessments(id) ON DELETE CASCADE,
+  student_id      UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  school_id       UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  subject         TEXT NOT NULL,
+  marks_obtained  NUMERIC(6,2) NOT NULL DEFAULT 0 CHECK (marks_obtained >= 0),
+  total_marks     NUMERIC(6,2) NOT NULL DEFAULT 100 CHECK (total_marks > 0),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (assessment_id, student_id, subject)
+);
+ALTER TABLE public.assessment_results ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE TRIGGER on_assessment_results_updated
+  BEFORE UPDATE ON public.assessment_results FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- ============================================================
+-- INDEXES (v3)
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_inquiries_school         ON public.inquiries(school_id);
+CREATE INDEX IF NOT EXISTS idx_inquiries_status         ON public.inquiries(status);
+CREATE INDEX IF NOT EXISTS idx_fee_invoices_school      ON public.fee_invoices(school_id);
+CREATE INDEX IF NOT EXISTS idx_fee_invoices_student     ON public.fee_invoices(student_id);
+CREATE INDEX IF NOT EXISTS idx_fee_invoices_status      ON public.fee_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_assessments_school       ON public.assessments(school_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_type         ON public.assessments(school_id, type);
+CREATE INDEX IF NOT EXISTS idx_asmt_results_assessment  ON public.assessment_results(assessment_id);
+CREATE INDEX IF NOT EXISTS idx_asmt_results_student     ON public.assessment_results(student_id);
+
+-- ============================================================
+-- RLS POLICIES (v3)
+-- ============================================================
+
+-- Inquiries
+DROP POLICY IF EXISTS "admin_all_inquiries"     ON public.inquiries;
+DROP POLICY IF EXISTS "school_manage_inquiries" ON public.inquiries;
+CREATE POLICY "admin_all_inquiries" ON public.inquiries FOR ALL
+  USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "school_manage_inquiries" ON public.inquiries FOR ALL
+  USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
+  WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());
+
+-- Fee Invoices
+DROP POLICY IF EXISTS "admin_all_invoices"     ON public.fee_invoices;
+DROP POLICY IF EXISTS "school_manage_invoices" ON public.fee_invoices;
+CREATE POLICY "admin_all_invoices" ON public.fee_invoices FOR ALL
+  USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "school_manage_invoices" ON public.fee_invoices FOR ALL
+  USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
+  WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());
+
+-- Assessments
+DROP POLICY IF EXISTS "admin_all_assessments"     ON public.assessments;
+DROP POLICY IF EXISTS "school_manage_assessments" ON public.assessments;
+CREATE POLICY "admin_all_assessments" ON public.assessments FOR ALL
+  USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "school_manage_assessments" ON public.assessments FOR ALL
+  USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
+  WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());
+
+-- Assessment Results
+DROP POLICY IF EXISTS "admin_all_asmt_results"     ON public.assessment_results;
+DROP POLICY IF EXISTS "school_manage_asmt_results" ON public.assessment_results;
+CREATE POLICY "admin_all_asmt_results" ON public.assessment_results FOR ALL
+  USING (get_my_role() = 'admin') WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "school_manage_asmt_results" ON public.assessment_results FOR ALL
+  USING (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id())
+  WITH CHECK (get_my_role() IN ('school_owner','staff') AND school_id = get_my_school_id());

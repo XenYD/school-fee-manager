@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
   LayoutDashboard, School, Users, GraduationCap, BadgeDollarSign,
   LogOut, Menu, X, ChevronRight, Sun, Moon, Receipt, Phone, ChevronDown,
+  ClipboardList, FileText, BookOpen,
 } from 'lucide-react'
 import FeeFlowLogo, { FeeFlowIcon } from './FeeFlowLogo'
 import toast from 'react-hot-toast'
@@ -85,8 +86,18 @@ export default function Layout({ children }: LayoutProps) {
       children: [
         { type: 'leaf', to: '/school/students', label: 'All Students' },
         { type: 'leaf', to: '/school/students/new', label: 'New Admission' },
+        { type: 'leaf', to: '/school/students/promote', label: 'Promote Students' },
       ],
     },
+    {
+      type: 'group', label: 'Admissions', icon: <ClipboardList size={18} />,
+      matchPaths: ['/school/admissions'],
+      children: [
+        { type: 'leaf', to: '/school/admissions', label: 'Inquiries' },
+      ],
+    },
+    { type: 'leaf', to: '/school/invoices', label: 'Invoices', icon: <FileText size={18} /> },
+    { type: 'leaf', to: '/school/assessments', label: 'Assessments', icon: <BookOpen size={18} /> },
     { type: 'leaf', to: '/school/contacts', label: 'Contacts', icon: <Phone size={18} /> },
     {
       type: 'group', label: 'Expenses', icon: <Receipt size={18} />,
@@ -109,6 +120,15 @@ export default function Layout({ children }: LayoutProps) {
         { type: 'leaf', to: '/school/students/new', label: 'New Admission' },
       ],
     },
+    {
+      type: 'group', label: 'Admissions', icon: <ClipboardList size={18} />,
+      matchPaths: ['/school/admissions'],
+      children: [
+        { type: 'leaf', to: '/school/admissions', label: 'Inquiries' },
+      ],
+    },
+    { type: 'leaf', to: '/school/invoices', label: 'Invoices', icon: <FileText size={18} /> },
+    { type: 'leaf', to: '/school/assessments', label: 'Assessments', icon: <BookOpen size={18} /> },
     { type: 'leaf', to: '/school/contacts', label: 'Contacts', icon: <Phone size={18} /> },
   ]
 

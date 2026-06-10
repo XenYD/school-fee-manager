@@ -24,6 +24,11 @@ import StudentsPage from './pages/school/StudentsPage'
 import FeesPage from './pages/school/FeesPage'
 import ExpensesPage from './pages/school/ExpensesPage'
 import ContactsPage from './pages/school/ContactsPage'
+import PromoteStudentsPage from './pages/school/PromoteStudentsPage'
+import InquiriesPage from './pages/school/InquiriesPage'
+import InvoicesPage from './pages/school/InvoicesPage'
+import AssessmentsPage from './pages/school/AssessmentsPage'
+import AssessmentResultsPage from './pages/school/AssessmentResultsPage'
 
 // Shared pages
 import AddExpensePage from './pages/shared/AddExpensePage'
@@ -69,10 +74,15 @@ function AppRoutes() {
       <Route path="/school/fees" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><FeesPage /></W></ProtectedRoute>} />
       <Route path="/school/students" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><StudentsPage /></W></ProtectedRoute>} />
       <Route path="/school/students/new" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><NewAdmissionPage /></W></ProtectedRoute>} />
+      <Route path="/school/students/promote" element={<ProtectedRoute allowedRoles={['school_owner']}><W><PromoteStudentsPage /></W></ProtectedRoute>} />
       <Route path="/school/students/:id" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><StudentProfilePage /></W></ProtectedRoute>} />
       <Route path="/school/contacts" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><ContactsPage /></W></ProtectedRoute>} />
       <Route path="/school/expenses" element={<ProtectedRoute allowedRoles={['school_owner']}><W><ExpensesPage /></W></ProtectedRoute>} />
       <Route path="/school/expenses/new" element={<ProtectedRoute allowedRoles={['school_owner']}><W><AddExpensePage /></W></ProtectedRoute>} />
+      <Route path="/school/admissions" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><InquiriesPage /></W></ProtectedRoute>} />
+      <Route path="/school/invoices" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><InvoicesPage /></W></ProtectedRoute>} />
+      <Route path="/school/assessments" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><AssessmentsPage /></W></ProtectedRoute>} />
+      <Route path="/school/assessments/:id" element={<ProtectedRoute allowedRoles={['school_owner','staff']}><W><AssessmentResultsPage /></W></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

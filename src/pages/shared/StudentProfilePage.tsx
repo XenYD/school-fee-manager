@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import type { Student } from '../../types'
+import { CLASS_LIST } from '../../types'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import {
-  ArrowLeft, User, Phone, BookOpen, Heart, AlertCircle,
-  GraduationCap, Calendar, Download, Users, MapPin,
-  CreditCard, Droplets, Cross, School2,
+  ArrowLeft, User, Phone, BookOpen, AlertCircle,
+  GraduationCap, Download, Users,
+  Droplets, School2, TrendingUp, TrendingDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
@@ -23,7 +24,11 @@ export default function StudentProfilePage() {
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'demo'
+  const canPromote = profile?.role === 'admin' || profile?.role === 'school_owner'
   const backPath = isAdmin ? '/admin/students' : '/school/students'
+  const [promoting, setPromoting] = useState(false)
+  const [demoting, setDemoting] = useState(false)
+  const [schoolData, setSchoolData] = useState<{ class_fees?: Record<string, number> } | null>(null)
 
   useEffect(() => {
     if (id) loadStudent(id)
@@ -33,12 +38,14 @@ export default function StudentProfilePage() {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('*, schools(name)')
+        .select('*, schools(name, class_fees)')
         .eq('id', studentId)
         .single()
       if (error) throw error
       setStudent(data as Student)
-      setSchoolName((data as Student & { schools?: { name: string } }).schools?.name ?? '')
+      const s = data as Student & { schools?: { name: string; class_fees?: Record<string, number> } }
+      setSchoolName(s.schools?.name ?? '')
+      setSchoolData(s.schools ?? null)
 
       // Load siblings
       if (data.sibling_ids?.length) {
@@ -66,6 +73,74 @@ export default function StudentProfilePage() {
     if (!dob) return null
     const diff = Date.now() - new Date(dob).getTime()
     return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25))
+  }
+
+  function getNextClass(cls: string): string | null {
+    const idx = CLASS_LIST.indexOf(cls)
+    if (idx === -1) return null
+    if (idx === CLASS_LIST.length - 1) return 'Graduated'
+    return CLASS_LIST[idx + 1]
+  }
+
+  function getPrevClass(cls: string): string | null {
+    const idx = CLASS_LIST.indexOf(cls)
+    if (idx <= 0) return null
+    return CLASS_LIST[idx - 1]
+  }
+
+  async function handlePromote() {
+    if (!student) return
+    const nextClass = getNextClass(student.class)
+    if (!nextClass) return
+    const isGraduating = nextClass === 'Graduated'
+    if (!confirm(isGraduating
+      ? `Graduate ${student.name}? They will be marked as graduated.`
+      : `Promote ${student.name} to ${nextClass}?`)) return
+    setPromoting(true)
+    try {
+      const newFee = !isGraduating && schoolData?.class_fees?.[nextClass]
+        ? Number(schoolData.class_fees[nextClass])
+        : Number(student.fee_amount)
+      const payload = isGraduating
+        ? { status: 'graduated' }
+        : { class: nextClass, fee_amount: newFee }
+      const { error } = await supabase.from('students').update(payload).eq('id', student.id)
+      if (error) throw error
+      toast.success(isGraduating ? `${student.name} has graduated!` : `Promoted to ${nextClass}`)
+      if (isGraduating) {
+        setStudent({ ...student, status: 'graduated' })
+      } else {
+        setStudent({ ...student, class: nextClass, fee_amount: newFee })
+      }
+    } catch {
+      toast.error('Promotion failed')
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  async function handleDemote() {
+    if (!student) return
+    const prevClass = getPrevClass(student.class)
+    if (!prevClass) return toast.error('Cannot demote below Class 1')
+    if (!confirm(`Demote ${student.name} from ${student.class} to ${prevClass}?`)) return
+    setDemoting(true)
+    try {
+      const newFee = schoolData?.class_fees?.[prevClass]
+        ? Number(schoolData.class_fees[prevClass])
+        : Number(student.fee_amount)
+      const { error } = await supabase
+        .from('students')
+        .update({ class: prevClass, fee_amount: newFee })
+        .eq('id', student.id)
+      if (error) throw error
+      toast.success(`Demoted to ${prevClass}`)
+      setStudent({ ...student, class: prevClass, fee_amount: newFee })
+    } catch {
+      toast.error('Demotion failed')
+    } finally {
+      setDemoting(false)
+    }
   }
 
   async function downloadPDF() {
@@ -282,12 +357,50 @@ export default function StudentProfilePage() {
             <p className="text-xs text-gray-500 mt-0.5">Full admission details for this student</p>
           </div>
         </div>
-        <button onClick={downloadPDF} disabled={generatingPdf}
-          className="btn-primary text-sm flex items-center gap-2">
-          {generatingPdf
-            ? <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating...</>
-            : <><Download size={15} /> Download PDF</>}
-        </button>
+        <div className="flex items-center gap-2">
+          {canPromote && student.status !== 'graduated' && (
+            <>
+              {getPrevClass(student.class) && (
+                <button
+                  onClick={handleDemote}
+                  disabled={demoting || promoting}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50"
+                  style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-3)' }}
+                  title={`Demote to ${getPrevClass(student.class)}`}
+                >
+                  {demoting
+                    ? <div className="h-3 w-3 border border-current border-t-transparent rounded-full animate-spin" />
+                    : <TrendingDown size={13} />}
+                  <span className="hidden sm:inline">Demote</span>
+                </button>
+              )}
+              {getNextClass(student.class) && (
+                <button
+                  onClick={handlePromote}
+                  disabled={promoting || demoting}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-50"
+                  style={{
+                    backgroundColor: student.class === 'Class 10' ? '#059669' : 'var(--c-accent)',
+                  }}
+                  title={student.class === 'Class 10' ? 'Graduate' : `Promote to ${getNextClass(student.class)}`}
+                >
+                  {promoting
+                    ? <div className="h-3 w-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                    : student.class === 'Class 10' ? <GraduationCap size={13} /> : <TrendingUp size={13} />}
+                  <span className="hidden sm:inline">
+                    {student.class === 'Class 10' ? 'Graduate' : 'Promote'}
+                  </span>
+                </button>
+              )}
+            </>
+          )}
+          <button onClick={downloadPDF} disabled={generatingPdf}
+            className="btn-primary text-sm flex items-center gap-2">
+            {generatingPdf
+              ? <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating...</>
+              : <><Download size={15} /> Download PDF</>}
+          </button>
+        </div>
       </div>
 
       {/* Student hero card */}
@@ -304,6 +417,12 @@ export default function StudentProfilePage() {
                 style={{ backgroundColor: 'rgba(74,144,217,0.4)' }}>
                 {student.class}
               </span>
+              {student.status === 'graduated' && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold text-white flex items-center gap-1"
+                  style={{ backgroundColor: 'rgba(5,150,105,0.5)' }}>
+                  <GraduationCap size={11} /> Graduated
+                </span>
+              )}
               {student.gender && (
                 <span className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
                   style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)' }}>

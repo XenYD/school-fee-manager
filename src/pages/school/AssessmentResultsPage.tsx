@@ -71,11 +71,12 @@ export default function AssessmentResultsPage() {
       const results = (resData ?? []) as AssessmentResult[]
       setExistingResults(results)
 
-      // Build initial marks map
+      // Build initial marks map from subject_marks keys
       const initialMarks: MarksMap = {}
+      const subjects = Object.keys(asmt.subject_marks)
       for (const student of studs) {
         initialMarks[student.id] = {}
-        for (const subject of asmt.subjects) {
+        for (const subject of subjects) {
           const existing = results.find(
             (r) => r.student_id === student.id && r.subject === subject
           )
@@ -116,14 +117,16 @@ export default function AssessmentResultsPage() {
     try {
       const upsertRows: Omit<AssessmentResult, 'id' | 'created_at' | 'updated_at' | 'students'>[] = []
 
+      const subjects = Object.keys(assessment.subject_marks)
       for (const student of students) {
-        for (const subject of assessment.subjects) {
+        for (const subject of subjects) {
           const raw = marks[student.id]?.[subject]
           if (raw === '' || raw === undefined) continue
           const marksObtained = parseFloat(raw)
           if (isNaN(marksObtained)) continue
-          if (marksObtained < 0 || marksObtained > assessment.total_marks) {
-            toast.error(`Invalid marks for ${student.name} in ${subject}`)
+          const maxMarks = assessment.subject_marks[subject]
+          if (marksObtained < 0 || marksObtained > maxMarks) {
+            toast.error(`Marks for "${student.name}" in "${subject}" must be between 0 and ${maxMarks}`)
             setSaving(false)
             return
           }
@@ -133,7 +136,6 @@ export default function AssessmentResultsPage() {
             school_id: assessment.school_id,
             subject,
             marks_obtained: marksObtained,
-            total_marks: assessment.total_marks,
           })
         }
       }
@@ -166,8 +168,10 @@ export default function AssessmentResultsPage() {
   // Computed student summary
   const studentSummaries = useMemo(() => {
     if (!assessment) return []
+    const subjects = Object.keys(assessment.subject_marks)
     return students.map((student) => {
-      const studentMarks = assessment.subjects.map((subject) => {
+      const studentMarks = subjects.map((subject) => {
+        const maxMarks = assessment.subject_marks[subject]
         const raw = marks[student.id]?.[subject]
         const val = raw !== '' && raw !== undefined ? parseFloat(raw) : null
         const saved = existingResults.find(
@@ -176,13 +180,13 @@ export default function AssessmentResultsPage() {
         return {
           subject,
           obtained: val ?? (saved ? Number(saved.marks_obtained) : null),
-          total: assessment.total_marks,
+          maxMarks,
         }
       })
 
       const entered = studentMarks.filter((m) => m.obtained !== null)
       const totalObtained = entered.reduce((sum, m) => sum + (m.obtained ?? 0), 0)
-      const totalPossible = assessment.subjects.length * assessment.total_marks
+      const totalPossible = subjects.reduce((s, subj) => s + assessment.subject_marks[subj], 0)
       const percentage = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0
       const grade = entered.length > 0 ? getGrade(percentage) : '—'
 
@@ -225,11 +229,18 @@ export default function AssessmentResultsPage() {
         W - margin, 18, { align: 'right' }
       )
 
+      const subjects = Object.keys(assessment.subject_marks)
+      const totalPossible = subjects.reduce((s, subj) => s + assessment.subject_marks[subj], 0)
+
+      // Build header: show each subject with its max marks
+      const subjectHeaders = subjects.map(
+        (subj) => `${subj}\n(/${assessment.subject_marks[subj]})`
+      )
       const headers = [
         'Sr.',
         'Student Name',
-        ...assessment.subjects,
-        `Total\n(${assessment.subjects.length * assessment.total_marks})`,
+        ...subjectHeaders,
+        `Total\n(/${totalPossible})`,
         'Percentage',
         'Grade',
       ]
@@ -261,19 +272,19 @@ export default function AssessmentResultsPage() {
         columnStyles: {
           0: { halign: 'center', cellWidth: 10 },
           1: { cellWidth: 40 },
-          ...(assessment.subjects.reduce((acc, _, i) => {
+          ...(subjects.reduce((acc, _, i) => {
             acc[i + 2] = { halign: 'center', cellWidth: 18 }
             return acc
           }, {} as Record<number, { halign: 'center'; cellWidth: number }>)),
-          [2 + assessment.subjects.length]: { halign: 'center', fontStyle: 'bold', cellWidth: 20 },
-          [3 + assessment.subjects.length]: { halign: 'center', cellWidth: 20 },
-          [4 + assessment.subjects.length]: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+          [2 + subjects.length]: { halign: 'center', fontStyle: 'bold', cellWidth: 20 },
+          [3 + subjects.length]: { halign: 'center', cellWidth: 20 },
+          [4 + subjects.length]: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
         },
         alternateRowStyles: { fillColor: [248, 249, 250] },
         margin: { left: margin, right: margin },
         didParseCell: (data) => {
           const col = data.column.index
-          const gradeCol = 4 + assessment.subjects.length
+          const gradeCol = 4 + subjects.length
           if (data.section === 'body' && col === gradeCol) {
             const grade = data.cell.raw as string
             const color = getGradeColor(grade)
@@ -333,14 +344,27 @@ export default function AssessmentResultsPage() {
 
   function exportExcel() {
     if (!assessment) return
+    const subjects = Object.keys(assessment.subject_marks)
+    const totalPossible = subjects.reduce((s, subj) => s + assessment.subject_marks[subj], 0)
+
+    // Two header rows: row 1 = labels, row 2 = max marks for subject columns
     const headers = [
       'Sr.',
       'Student Name',
-      ...assessment.subjects,
+      ...subjects,
       'Total Obtained',
-      `Total Marks (${assessment.subjects.length * assessment.total_marks})`,
+      `Total Marks (${totalPossible})`,
       'Percentage',
       'Grade',
+    ]
+    const maxRow = [
+      '',
+      'Max Marks →',
+      ...subjects.map((subj) => assessment.subject_marks[subj]),
+      totalPossible,
+      '',
+      '',
+      '',
     ]
 
     const rows = studentSummaries.map((s, idx) => [
@@ -353,7 +377,7 @@ export default function AssessmentResultsPage() {
       s.grade,
     ])
 
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const ws = XLSX.utils.aoa_to_sheet([headers, maxRow, ...rows])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Results')
     XLSX.writeFile(
@@ -449,9 +473,13 @@ export default function AssessmentResultsPage() {
       >
         {[
           { label: 'Class', value: assessment.class },
-          { label: 'Subjects', value: `${assessment.subjects.length}` },
-          { label: 'Marks per Subject', value: String(assessment.total_marks) },
-          { label: 'Total Marks', value: String(assessment.subjects.length * assessment.total_marks) },
+          { label: 'Subjects', value: `${Object.keys(assessment.subject_marks).length}` },
+          {
+            label: 'Total Marks',
+            value: String(
+              Object.values(assessment.subject_marks).reduce((s, m) => s + m, 0)
+            ),
+          },
           { label: 'Students', value: String(students.length) },
         ].map((item) => (
           <div key={item.label} className="text-center">
@@ -477,10 +505,10 @@ export default function AssessmentResultsPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 sticky left-0 z-10 bg-inherit min-w-[160px]">
                       Student
                     </th>
-                    {assessment.subjects.map((subj) => (
+                    {Object.entries(assessment.subject_marks).map(([subj, maxMarks]) => (
                       <th key={subj} className="px-3 py-3 text-xs font-semibold text-gray-500 text-center min-w-[90px]">
                         {subj}
-                        <div className="text-xs font-normal text-gray-400">/ {assessment.total_marks}</div>
+                        <div className="text-xs font-normal text-gray-400">/ {maxMarks}</div>
                       </th>
                     ))}
                     <th className="px-3 py-3 text-xs font-semibold text-gray-500 text-center min-w-[70px]">
@@ -518,11 +546,11 @@ export default function AssessmentResultsPage() {
                         </div>
                       </td>
 
-                      {assessment.subjects.map((subj) => {
+                      {Object.entries(assessment.subject_marks).map(([subj, maxMarks]) => {
                         const val = marks[summary.student.id]?.[subj] ?? ''
                         const num = val !== '' ? parseFloat(val) : null
                         const invalid =
-                          num !== null && (isNaN(num) || num < 0 || num > assessment.total_marks)
+                          num !== null && (isNaN(num) || num < 0 || num > maxMarks)
                         return (
                           <td key={subj} className="px-2 py-1.5 text-center">
                             {canEdit ? (
@@ -530,7 +558,7 @@ export default function AssessmentResultsPage() {
                                 type="number"
                                 value={val}
                                 min={0}
-                                max={assessment.total_marks}
+                                max={maxMarks}
                                 onChange={(e) =>
                                   setMark(summary.student.id, subj, e.target.value)
                                 }

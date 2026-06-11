@@ -389,6 +389,8 @@ CREATE OR REPLACE TRIGGER on_fee_invoices_updated
   BEFORE UPDATE ON public.fee_invoices FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Assessments
+-- subject_marks JSONB stores per-subject max marks, e.g.:
+-- {"English": 100, "Urdu": 100, "Mathematics": 100, "Science": 75, "Social Studies": 50, "Islamiyat": 50}
 CREATE TABLE IF NOT EXISTS public.assessments (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id       UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
@@ -396,8 +398,7 @@ CREATE TABLE IF NOT EXISTS public.assessments (
   name            TEXT NOT NULL,
   class           TEXT NOT NULL,
   date            DATE NOT NULL,
-  subjects        TEXT[] NOT NULL DEFAULT '{}',
-  total_marks     NUMERIC(6,2) NOT NULL DEFAULT 100 CHECK (total_marks > 0),
+  subject_marks   JSONB NOT NULL DEFAULT '{}',
   created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -406,7 +407,7 @@ ALTER TABLE public.assessments ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE TRIGGER on_assessments_updated
   BEFORE UPDATE ON public.assessments FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- Assessment Results
+-- Assessment Results (total_marks comes from assessments.subject_marks at query time)
 CREATE TABLE IF NOT EXISTS public.assessment_results (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assessment_id   UUID NOT NULL REFERENCES public.assessments(id) ON DELETE CASCADE,
@@ -414,7 +415,6 @@ CREATE TABLE IF NOT EXISTS public.assessment_results (
   school_id       UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
   subject         TEXT NOT NULL,
   marks_obtained  NUMERIC(6,2) NOT NULL DEFAULT 0 CHECK (marks_obtained >= 0),
-  total_marks     NUMERIC(6,2) NOT NULL DEFAULT 100 CHECK (total_marks > 0),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (assessment_id, student_id, subject)

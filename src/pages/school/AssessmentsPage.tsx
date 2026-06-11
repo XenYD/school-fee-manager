@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import type { Assessment, AssessmentType } from '../../types'
-import { CLASS_LIST, ASSESSMENT_TYPE_LABELS } from '../../types'
+import { CLASS_LIST, ASSESSMENT_TYPE_LABELS, DEFAULT_SUBJECT_MARKS } from '../../types'
 import {
   Plus, X, ClipboardList, ChevronDown, ChevronRight,
-  BookOpen, Calendar, Users,
+  BookOpen, Calendar, Users, Trash2,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import toast from 'react-hot-toast'
@@ -23,6 +23,18 @@ const TYPE_ACCENT: Record<AssessmentType, string> = {
   terminal: '#059669',
 }
 
+interface SubjectRow {
+  name: string
+  marks: string
+}
+
+function defaultSubjectRows(): SubjectRow[] {
+  return Object.entries(DEFAULT_SUBJECT_MARKS).map(([name, marks]) => ({
+    name,
+    marks: String(marks),
+  }))
+}
+
 export default function AssessmentsPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -32,13 +44,12 @@ export default function AssessmentsPage() {
   const [saving, setSaving] = useState(false)
   const [filterType, setFilterType] = useState<AssessmentType | 'all'>('all')
 
-  // Form
+  // Form state
   const [formType, setFormType] = useState<AssessmentType>('monthly_test')
   const [formName, setFormName] = useState('')
   const [formClass, setFormClass] = useState('')
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10))
-  const [formSubjects, setFormSubjects] = useState('English, Urdu, Mathematics, Science, Social Studies, Islamiyat')
-  const [formTotalMarks, setFormTotalMarks] = useState('100')
+  const [subjectRows, setSubjectRows] = useState<SubjectRow[]>(defaultSubjectRows())
 
   useEffect(() => {
     loadAssessments()
@@ -59,8 +70,8 @@ export default function AssessmentsPage() {
       const { data, error } = await query
       if (error) throw error
       setAssessments(data ?? [])
-    } catch {
-      toast.error('Failed to load assessments')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load assessments')
     } finally {
       setLoading(false)
     }
@@ -71,21 +82,53 @@ export default function AssessmentsPage() {
     setFormName('')
     setFormClass('')
     setFormDate(new Date().toISOString().slice(0, 10))
-    setFormSubjects('English, Urdu, Mathematics, Science, Social Studies, Islamiyat')
-    setFormTotalMarks('100')
+    setSubjectRows(defaultSubjectRows())
   }
 
+  // ── Subject row helpers ──────────────────────────────────────────────────
+  function updateSubjectName(idx: number, name: string) {
+    setSubjectRows((prev) => prev.map((r, i) => (i === idx ? { ...r, name } : r)))
+  }
+
+  function updateSubjectMarks(idx: number, marks: string) {
+    setSubjectRows((prev) => prev.map((r, i) => (i === idx ? { ...r, marks } : r)))
+  }
+
+  function removeSubject(idx: number) {
+    setSubjectRows((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function addSubject() {
+    setSubjectRows((prev) => [...prev, { name: '', marks: '100' }])
+  }
+
+  // ── Create ────────────────────────────────────────────────────────────────
   async function handleCreate() {
     if (!formName.trim()) return toast.error('Assessment name is required')
     if (!formClass) return toast.error('Select a class')
     if (!formDate) return toast.error('Date is required')
-    const subjectList = formSubjects
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    if (!subjectList.length) return toast.error('Add at least one subject')
-    const totalMarks = parseFloat(formTotalMarks)
-    if (!totalMarks || totalMarks <= 0) return toast.error('Total marks must be greater than 0')
+
+    // Validate subject rows
+    const validRows = subjectRows.filter((r) => r.name.trim())
+    if (!validRows.length) return toast.error('Add at least one subject')
+
+    for (const row of validRows) {
+      const m = parseFloat(row.marks)
+      if (!row.name.trim()) return toast.error('Subject name cannot be empty')
+      if (isNaN(m) || m <= 0) return toast.error(`Invalid marks for "${row.name}"`)
+    }
+
+    // Check duplicate subject names
+    const names = validRows.map((r) => r.name.trim().toLowerCase())
+    if (new Set(names).size !== names.length) {
+      return toast.error('Duplicate subject names found')
+    }
+
+    // Build subject_marks object (preserving order via insertion order)
+    const subject_marks: Record<string, number> = {}
+    for (const row of validRows) {
+      subject_marks[row.name.trim()] = parseFloat(row.marks)
+    }
 
     setSaving(true)
     try {
@@ -97,13 +140,14 @@ export default function AssessmentsPage() {
           name: formName.trim(),
           class: formClass,
           date: formDate,
-          subjects: subjectList,
-          total_marks: totalMarks,
+          subject_marks,
           created_by: profile!.id,
         })
         .select()
         .single()
+
       if (error) throw error
+
       setAssessments((prev) => [data, ...prev])
       setShowForm(false)
       resetForm()
@@ -139,9 +183,9 @@ export default function AssessmentsPage() {
     {} as Record<AssessmentType, Assessment[]>
   )
 
+  const canEdit = profile?.role !== 'demo'
   const inputCls = 'input-field text-sm'
   const labelCls = 'block text-xs font-semibold mb-1.5'
-  const canEdit = profile?.role !== 'demo'
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -170,25 +214,24 @@ export default function AssessmentsPage() {
             <button
               key={t}
               onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                filterType === t
-                  ? 'text-white'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
               style={
                 filterType === t
                   ? {
                       backgroundColor:
-                        t === 'all'
-                          ? 'var(--c-accent)'
-                          : TYPE_ACCENT[t as AssessmentType],
+                        t === 'all' ? 'var(--c-accent)' : TYPE_ACCENT[t as AssessmentType],
+                      color: '#fff',
                     }
-                  : { backgroundColor: 'var(--c-surface-2)' }
+                  : { backgroundColor: 'var(--c-surface-2)', color: 'var(--c-text-3)' }
               }
             >
               {t === 'all' ? 'All' : ASSESSMENT_TYPE_LABELS[t as AssessmentType]}
               <span className="ml-1.5 opacity-70">
-                ({t === 'all' ? assessments.length : assessments.filter((a) => a.type === t).length})
+                (
+                {t === 'all'
+                  ? assessments.length
+                  : assessments.filter((a) => a.type === t).length}
+                )
               </span>
             </button>
           )
@@ -203,7 +246,9 @@ export default function AssessmentsPage() {
           <ClipboardList size={40} className="mx-auto mb-3" style={{ color: 'var(--c-text-4)' }} />
           <p className="font-medium text-gray-500">No assessments yet</p>
           <p className="text-xs text-gray-400 mt-1">
-            {canEdit ? 'Create an assessment to start entering marks.' : 'No assessments have been created yet.'}
+            {canEdit
+              ? 'Create an assessment to start entering marks.'
+              : 'No assessments have been created yet.'}
           </p>
         </div>
       ) : (
@@ -220,75 +265,98 @@ export default function AssessmentsPage() {
                   {ASSESSMENT_TYPE_LABELS[type]}
                 </h2>
                 <div className="space-y-2">
-                  {group.map((assessment) => (
-                    <div key={assessment.id} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between gap-3">
-                        <div
-                          className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer"
-                          onClick={() => navigate(`/school/assessments/${assessment.id}`)}
-                        >
+                  {group.map((assessment) => {
+                    const subjects = Object.keys(assessment.subject_marks)
+                    const totalMax = Object.values(assessment.subject_marks).reduce(
+                      (s, m) => s + m,
+                      0
+                    )
+                    return (
+                      <div
+                        key={assessment.id}
+                        className="card p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between gap-3">
                           <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${TYPE_ACCENT[assessment.type]}20` }}
-                          >
-                            <BookOpen size={18} style={{ color: TYPE_ACCENT[assessment.type] }} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {assessment.name}
-                              </p>
-                              <span
-                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[assessment.type]}`}
-                              >
-                                {ASSESSMENT_TYPE_LABELS[assessment.type]}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 flex-wrap">
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Users size={11} /> {assessment.class}
-                              </span>
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Calendar size={11} />{' '}
-                                {new Date(assessment.date).toLocaleDateString('en-PK', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {assessment.subjects.length} subject
-                                {assessment.subjects.length !== 1 ? 's' : ''} ·{' '}
-                                {assessment.total_marks} marks each
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {assessment.subjects.join(', ')}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
+                            className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer"
                             onClick={() => navigate(`/school/assessments/${assessment.id}`)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-                            style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-3)' }}
                           >
-                            Results <ChevronRight size={12} />
-                          </button>
-                          {canEdit && (
-                            <button
-                              onClick={() => deleteAssessment(assessment.id)}
-                              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                              title="Delete assessment"
+                            <div
+                              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: `${TYPE_ACCENT[assessment.type]}20` }}
                             >
-                              <X size={14} />
+                              <BookOpen
+                                size={18}
+                                style={{ color: TYPE_ACCENT[assessment.type] }}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-gray-900 text-sm">
+                                  {assessment.name}
+                                </p>
+                                <span
+                                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[assessment.type]}`}
+                                >
+                                  {ASSESSMENT_TYPE_LABELS[assessment.type]}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Users size={11} /> {assessment.class}
+                                </span>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Calendar size={11} />{' '}
+                                  {new Date(assessment.date).toLocaleDateString('en-PK', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {subjects.length} subject{subjects.length !== 1 ? 's' : ''} ·
+                                  Total {totalMax} marks
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                {subjects.map((subj) => (
+                                  <span
+                                    key={subj}
+                                    className="text-xs px-2 py-0.5 rounded-full"
+                                    style={{
+                                      backgroundColor: `${TYPE_ACCENT[assessment.type]}15`,
+                                      color: TYPE_ACCENT[assessment.type],
+                                    }}
+                                  >
+                                    {subj}: {assessment.subject_marks[subj]}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => navigate(`/school/assessments/${assessment.id}`)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                              style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-3)' }}
+                            >
+                              Results <ChevronRight size={12} />
                             </button>
-                          )}
+                            {canEdit && (
+                              <button
+                                onClick={() => deleteAssessment(assessment.id)}
+                                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="Delete assessment"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -299,11 +367,14 @@ export default function AssessmentsPage() {
       {/* Create Assessment Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <h3 className="font-semibold text-gray-900">New Assessment</h3>
               <button
-                onClick={() => { setShowForm(false); resetForm() }}
+                onClick={() => {
+                  setShowForm(false)
+                  resetForm()
+                }}
                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X size={18} />
@@ -311,6 +382,7 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Type */}
               <div>
                 <label className={labelCls}>Assessment Type *</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -332,6 +404,7 @@ export default function AssessmentsPage() {
                 </div>
               </div>
 
+              {/* Name */}
               <div>
                 <label className={labelCls}>Assessment Name *</label>
                 <input
@@ -343,6 +416,7 @@ export default function AssessmentsPage() {
                 />
               </div>
 
+              {/* Class + Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Class *</label>
@@ -354,10 +428,15 @@ export default function AssessmentsPage() {
                     >
                       <option value="">— Select —</option>
                       {CLASS_LIST.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
                       ))}
                     </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+                    />
                   </div>
                 </div>
                 <div>
@@ -371,54 +450,88 @@ export default function AssessmentsPage() {
                 </div>
               </div>
 
+              {/* Subjects + marks table */}
               <div>
-                <label className={labelCls}>
-                  Subjects *{' '}
-                  <span className="font-normal text-gray-400">(comma-separated)</span>
-                </label>
-                <input
-                  type="text"
-                  value={formSubjects}
-                  onChange={(e) => setFormSubjects(e.target.value)}
-                  placeholder="English, Urdu, Mathematics, Science"
-                  className={inputCls}
-                />
-                {formSubjects && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {formSubjects.split(',').map((s, i) =>
-                      s.trim() ? (
-                        <span
-                          key={i}
-                          className="text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{
-                            backgroundColor: `${TYPE_ACCENT[formType]}20`,
-                            color: TYPE_ACCENT[formType],
-                          }}
-                        >
-                          {s.trim()}
-                        </span>
-                      ) : null
-                    )}
+                <div className="flex items-center justify-between mb-2">
+                  <label className={`${labelCls} mb-0`}>
+                    Subjects & Marks *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addSubject}
+                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors"
+                    style={{ color: 'var(--c-accent)', backgroundColor: 'rgba(74,144,217,0.1)' }}
+                  >
+                    <Plus size={12} /> Add Subject
+                  </button>
+                </div>
+
+                {/* Column headers */}
+                <div className="grid grid-cols-[1fr_90px_32px] gap-2 mb-1.5 px-1">
+                  <span className="text-xs font-semibold text-gray-400">Subject Name</span>
+                  <span className="text-xs font-semibold text-gray-400 text-center">Max Marks</span>
+                  <span />
+                </div>
+
+                <div className="space-y-2">
+                  {subjectRows.map((row, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_90px_32px] gap-2 items-center">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => updateSubjectName(idx, e.target.value)}
+                        placeholder={`Subject ${idx + 1}`}
+                        className={`${inputCls} py-2`}
+                      />
+                      <input
+                        type="number"
+                        value={row.marks}
+                        onChange={(e) => updateSubjectMarks(idx, e.target.value)}
+                        min={1}
+                        max={1000}
+                        placeholder="100"
+                        className={`${inputCls} py-2 text-center`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSubject(idx)}
+                        disabled={subjectRows.length <= 1}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
+                        title="Remove subject"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Total */}
+                {subjectRows.some((r) => r.name.trim() && parseFloat(r.marks) > 0) && (
+                  <div
+                    className="mt-3 flex items-center justify-between px-3 py-2 rounded-lg text-xs"
+                    style={{ backgroundColor: 'var(--c-surface-2)' }}
+                  >
+                    <span className="text-gray-500">
+                      {subjectRows.filter((r) => r.name.trim()).length} subjects
+                    </span>
+                    <span className="font-bold text-gray-900">
+                      Total:{' '}
+                      {subjectRows
+                        .filter((r) => r.name.trim())
+                        .reduce((s, r) => s + (parseFloat(r.marks) || 0), 0)}{' '}
+                      marks
+                    </span>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className={labelCls}>Total Marks Per Subject *</label>
-                <input
-                  type="number"
-                  value={formTotalMarks}
-                  onChange={(e) => setFormTotalMarks(e.target.value)}
-                  min={1}
-                  placeholder="100"
-                  className={inputCls}
-                />
               </div>
             </div>
 
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
               <button
-                onClick={() => { setShowForm(false); resetForm() }}
+                onClick={() => {
+                  setShowForm(false)
+                  resetForm()
+                }}
                 className="btn-secondary flex-1 text-sm"
               >
                 Cancel

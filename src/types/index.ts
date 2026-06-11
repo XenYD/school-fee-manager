@@ -209,8 +209,8 @@ export interface Assessment {
   name: string
   class: string
   date: string
-  subjects: string[]
-  total_marks: number
+  /** Map of subject name → max marks, e.g. {"English": 100, "Science": 75} */
+  subject_marks: Record<string, number>
   created_by: string | null
   created_at: string
   updated_at: string
@@ -223,10 +223,18 @@ export interface AssessmentResult {
   school_id: string
   subject: string
   marks_obtained: number
-  total_marks: number
   created_at: string
   updated_at: string
   students?: { name: string; class: string }
+}
+
+export const DEFAULT_SUBJECT_MARKS: Record<string, number> = {
+  English: 100,
+  Urdu: 100,
+  Mathematics: 100,
+  Science: 75,
+  'Social Studies': 50,
+  Islamiyat: 50,
 }
 
 export interface StudentWithFee extends Student {

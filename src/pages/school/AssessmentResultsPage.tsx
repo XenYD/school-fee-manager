@@ -1,11 +1,11 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import type { Assessment, AssessmentResult, Student } from '../../types'
 import { ASSESSMENT_TYPE_LABELS, getGrade, getGradeColor } from '../../types'
 import {
-  ArrowLeft, Save, Download, FileSpreadsheet, AlertCircle,
+  ArrowLeft, Save, Download, FileSpreadsheet, AlertCircle, CheckCheck, X,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import toast from 'react-hot-toast'
@@ -15,6 +15,11 @@ import * as XLSX from 'xlsx'
 
 // Marks map: studentId -> subject -> marks
 type MarksMap = Record<string, Record<string, string>>
+
+// Cell key format: "studentId|||subject"
+function cellKey(studentId: string, subject: string) {
+  return `${studentId}|||${subject}`
+}
 
 export default function AssessmentResultsPage() {
   const { id: assessmentId } = useParams<{ id: string }>()
@@ -29,9 +34,32 @@ export default function AssessmentResultsPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [schoolName, setSchoolName] = useState('')
 
+  // ── Bulk cell selection ────────────────────────────────────────────────────
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
+  const [dragStartPos, setDragStartPos] = useState<[number, number] | null>(null)
+  const [lastClickPos, setLastClickPos] = useState<[number, number] | null>(null)
+  const [bulkValue, setBulkValue] = useState('')
+  const bulkInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (assessmentId) loadAll(assessmentId)
   }, [assessmentId])
+
+  // Stop drag on mouse-up anywhere on the page
+  useEffect(() => {
+    function stopDrag() { setDragStartPos(null) }
+    window.addEventListener('mouseup', stopDrag)
+    return () => window.removeEventListener('mouseup', stopDrag)
+  }, [])
+
+  // Clear selection on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { setSelectedCells(new Set()); setBulkValue('') }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   async function loadAll(aId: string) {
     setLoading(true)
@@ -398,6 +426,84 @@ export default function AssessmentResultsPage() {
 
   const canEdit = profile?.role !== 'demo'
 
+  // ── Selection helpers ──────────────────────────────────────────────────────
+  const subjects = assessment ? Object.keys(assessment.subject_marks) : []
+
+  function getPos(studentId: string, subject: string): [number, number] {
+    return [students.findIndex((s) => s.id === studentId), subjects.indexOf(subject)]
+  }
+
+  function getRectCells(a: [number, number], b: [number, number]): Set<string> {
+    const minR = Math.min(a[0], b[0]), maxR = Math.max(a[0], b[0])
+    const minC = Math.min(a[1], b[1]), maxC = Math.max(a[1], b[1])
+    const cells = new Set<string>()
+    for (let r = minR; r <= maxR; r++) {
+      for (let c = minC; c <= maxC; c++) {
+        cells.add(cellKey(students[r].id, subjects[c]))
+      }
+    }
+    return cells
+  }
+
+  function handleCellMouseDown(e: React.MouseEvent, studentIdx: number, subjIdx: number) {
+    const key = cellKey(students[studentIdx].id, subjects[subjIdx])
+    const pos: [number, number] = [studentIdx, subjIdx]
+
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      setSelectedCells((prev) => {
+        const next = new Set(prev)
+        next.has(key) ? next.delete(key) : next.add(key)
+        return next
+      })
+      setLastClickPos(pos)
+    } else if (e.shiftKey && lastClickPos) {
+      e.preventDefault()
+      setSelectedCells(getRectCells(lastClickPos, pos))
+    } else {
+      // Start fresh selection; drag will extend it
+      setSelectedCells(new Set([key]))
+      setDragStartPos(pos)
+      setLastClickPos(pos)
+    }
+  }
+
+  function handleCellMouseEnter(e: React.MouseEvent, studentIdx: number, subjIdx: number) {
+    // Only extend selection while primary mouse button is held (drag)
+    if (e.buttons !== 1 || !dragStartPos) return
+    setSelectedCells(getRectCells(dragStartPos, [studentIdx, subjIdx]))
+  }
+
+  function applyBulkValue() {
+    if (!assessment || !bulkValue.trim()) return
+    const val = parseFloat(bulkValue)
+    if (isNaN(val) || val < 0) return toast.error('Enter a valid number (0 or above)')
+
+    // Validate against per-subject max marks first
+    for (const key of selectedCells) {
+      const subject = key.split('|||')[1]
+      const maxMarks = assessment.subject_marks[subject]
+      if (val > maxMarks) {
+        return toast.error(`${val} exceeds max marks (${maxMarks}) for "${subject}"`)
+      }
+    }
+
+    setMarks((prev) => {
+      const next: MarksMap = {}
+      for (const [sid, subMap] of Object.entries(prev)) next[sid] = { ...subMap }
+      for (const key of selectedCells) {
+        const [studentId, subject] = key.split('|||')
+        if (!next[studentId]) next[studentId] = {}
+        next[studentId][subject] = String(val)
+      }
+      return next
+    })
+
+    toast.success(`Applied ${val} to ${selectedCells.size} cell${selectedCells.size !== 1 ? 's' : ''}`)
+    setSelectedCells(new Set())
+    setBulkValue('')
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -496,9 +602,81 @@ export default function AssessmentResultsPage() {
         </div>
       ) : (
         <>
+          {/* Bulk fill toolbar — appears when cells are selected */}
+          {canEdit && selectedCells.size > 0 && (
+            <div
+              className="sticky top-16 z-20 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border"
+              style={{
+                background: 'var(--glass-bg-strong)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderColor: 'var(--c-accent)',
+                boxShadow: '0 4px 24px rgba(74,144,217,0.18)',
+              }}
+            >
+              {/* Selection count badge */}
+              <span
+                className="text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0"
+                style={{ backgroundColor: 'rgba(74,144,217,0.15)', color: 'var(--c-accent)' }}
+              >
+                {selectedCells.size} cell{selectedCells.size !== 1 ? 's' : ''} selected
+              </span>
+
+              <span className="text-xs text-gray-400 hidden sm:inline">
+                Enter marks to fill all selected cells:
+              </span>
+
+              {/* Bulk value input */}
+              <input
+                ref={bulkInputRef}
+                type="number"
+                value={bulkValue}
+                onChange={(e) => setBulkValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyBulkValue() }}
+                placeholder="Marks..."
+                min={0}
+                className="w-24 text-center rounded-lg border py-1.5 px-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
+                style={{ borderColor: 'var(--c-accent)', backgroundColor: 'var(--c-surface-2)' }}
+                autoFocus
+              />
+
+              <button
+                onClick={applyBulkValue}
+                disabled={!bulkValue.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-40"
+                style={{ backgroundColor: 'var(--c-accent)' }}
+              >
+                <CheckCheck size={13} /> Apply
+              </button>
+
+              <button
+                onClick={() => { setSelectedCells(new Set()); setBulkValue('') }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-3)' }}
+                title="Clear selection (Esc)"
+              >
+                <X size={13} /> Clear
+              </button>
+
+              <span className="text-xs text-gray-400 hidden md:inline ml-auto">
+                Tip: drag, Ctrl+click or Shift+click to select · Enter to apply · Esc to cancel
+              </span>
+            </div>
+          )}
+
           {/* Marks entry table — horizontal scroll */}
-          <div className="card p-0 overflow-hidden">
-            <div className="overflow-x-auto">
+          {canEdit && selectedCells.size === 0 && (
+            <p className="text-xs text-gray-400 px-1">
+              Tip: click and drag across cells, or use Ctrl+click / Shift+click to select multiple cells for bulk fill.
+            </p>
+          )}
+
+          <div
+            className="card p-0 overflow-hidden"
+            // Prevent browser text-selection during drag
+            onMouseDown={(e) => { if (dragStartPos) e.preventDefault() }}
+          >
+            <div className="overflow-x-auto" style={{ userSelect: dragStartPos ? 'none' : 'auto' }}>
               <table className="w-full text-sm min-w-max">
                 <thead>
                   <tr style={{ backgroundColor: 'var(--c-surface-2)' }}>
@@ -523,7 +701,7 @@ export default function AssessmentResultsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {studentSummaries.map((summary, idx) => (
+                  {studentSummaries.map((summary, studentIdx) => (
                     <tr
                       key={summary.student.id}
                       className="border-t transition-colors hover:bg-gray-50"
@@ -538,7 +716,7 @@ export default function AssessmentResultsPage() {
                             className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                             style={{ background: 'linear-gradient(135deg, #4A90D9, #2C5F8A)' }}
                           >
-                            {idx + 1}
+                            {studentIdx + 1}
                           </span>
                           <span className="font-medium text-gray-900 text-xs truncate max-w-[110px]">
                             {summary.student.name}
@@ -546,30 +724,54 @@ export default function AssessmentResultsPage() {
                         </div>
                       </td>
 
-                      {Object.entries(assessment.subject_marks).map(([subj, maxMarks]) => {
+                      {Object.entries(assessment.subject_marks).map(([subj, maxMarks], subjIdx) => {
+                        const key = cellKey(summary.student.id, subj)
+                        const isSelected = selectedCells.has(key)
                         const val = marks[summary.student.id]?.[subj] ?? ''
                         const num = val !== '' ? parseFloat(val) : null
-                        const invalid =
-                          num !== null && (isNaN(num) || num < 0 || num > maxMarks)
+                        const invalid = num !== null && (isNaN(num) || num < 0 || num > maxMarks)
+
                         return (
-                          <td key={subj} className="px-2 py-1.5 text-center">
+                          <td
+                            key={subj}
+                            className="px-2 py-1.5 text-center transition-colors"
+                            style={
+                              isSelected
+                                ? { backgroundColor: 'rgba(74,144,217,0.10)' }
+                                : undefined
+                            }
+                            onMouseDown={
+                              canEdit
+                                ? (e) => handleCellMouseDown(e, studentIdx, subjIdx)
+                                : undefined
+                            }
+                            onMouseEnter={
+                              canEdit
+                                ? (e) => handleCellMouseEnter(e, studentIdx, subjIdx)
+                                : undefined
+                            }
+                          >
                             {canEdit ? (
                               <input
                                 type="number"
                                 value={val}
                                 min={0}
                                 max={maxMarks}
-                                onChange={(e) =>
-                                  setMark(summary.student.id, subj, e.target.value)
-                                }
-                                className={`w-16 text-center rounded-lg border py-1 px-1.5 text-xs font-medium transition-colors focus:outline-none focus:ring-1 ${
-                                  invalid
+                                onChange={(e) => setMark(summary.student.id, subj, e.target.value)}
+                                className={`w-16 text-center rounded-lg border py-1 px-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-1 ${
+                                  isSelected
+                                    ? 'border-blue-400 ring-1 ring-blue-400 bg-blue-50 text-blue-900'
+                                    : invalid
                                     ? 'border-red-300 bg-red-50 text-red-700 focus:ring-red-300'
                                     : num !== null
                                     ? 'border-green-200 bg-green-50 text-green-800 focus:ring-green-300'
                                     : 'border-gray-200 bg-gray-50 text-gray-700 focus:ring-blue-300'
                                 }`}
                                 placeholder="—"
+                                // Prevent mousedown on input from resetting selection when dragging
+                                onMouseDown={(e) => {
+                                  if (dragStartPos) e.stopPropagation()
+                                }}
                               />
                             ) : (
                               <span className="text-xs font-medium text-gray-700">

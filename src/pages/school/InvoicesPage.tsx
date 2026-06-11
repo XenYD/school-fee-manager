@@ -159,10 +159,7 @@ export default function InvoicesPage() {
       setInvoices((prev) => [data, ...prev])
       setShowForm(false)
       resetForm()
-      toast.success(`Invoice ${invoiceNumber} generated`)
-
-      // Auto download
-      await downloadInvoicePdf(data)
+      toast.success(`Invoice ${invoiceNumber} generated — use the PDF button to download`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate invoice')
     } finally {
@@ -602,7 +599,7 @@ export default function InvoicesPage() {
                   </>
                 ) : (
                   <>
-                    <FileText size={14} /> Generate & Download
+                    <FileText size={14} /> Generate Invoice
                   </>
                 )}
               </button>

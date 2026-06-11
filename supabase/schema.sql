@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS public.students (
   class                   TEXT NOT NULL,
   fee_amount              NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (fee_amount >= 0),
   exam_fee_amount         NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (exam_fee_amount >= 0),
+  status                  TEXT NOT NULL DEFAULT 'active'
+                            CHECK (status IN ('active', 'graduated')),
   parent_phone            TEXT,
   -- Extended admission fields
   date_of_birth           DATE,
@@ -136,16 +138,20 @@ CREATE TABLE IF NOT EXISTS public.fee_records (
 
 -- Payment Transactions — individual payment events
 CREATE TABLE IF NOT EXISTS public.payment_transactions (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fee_record_id   UUID NOT NULL REFERENCES public.fee_records(id) ON DELETE CASCADE,
-  student_id      UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
-  school_id       UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
-  amount          NUMERIC(10,2) NOT NULL CHECK (amount > 0),
-  payment_method  TEXT NOT NULL CHECK (payment_method IN ('cash', 'online')),
-  paid_by         UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  notes           TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fee_record_id    UUID NOT NULL REFERENCES public.fee_records(id) ON DELETE CASCADE,
+  student_id       UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  school_id        UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  amount           NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+  payment_method   TEXT NOT NULL CHECK (payment_method IN ('cash', 'online')),
+  paid_by          UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  notes            TEXT,
+  is_cancelled     BOOLEAN NOT NULL DEFAULT false,
+  cancelled_reason TEXT,
+  cancelled_by     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  cancelled_at     TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================
@@ -313,33 +319,33 @@ CREATE POLICY "staff_read_expenses"       ON public.expenses FOR SELECT
 -- ============================================================
 
 -- ============================================================
--- v3 MIGRATION: Promotions, Inquiries, Invoices, Assessments
--- Run these ALTER TABLE statements first on existing databases:
+-- v3 MIGRATION (existing databases only — skip for fresh installs)
+-- If you already had the schema before v3, run this block:
 -- ============================================================
---
--- ALTER TABLE public.students
---   ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
---     CHECK (status IN ('active', 'graduated'));
---
--- ALTER TABLE public.payment_transactions
---   ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT false,
---   ADD COLUMN IF NOT EXISTS cancelled_reason TEXT,
---   ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
---   ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
---
--- ============================================================
+DO $$
+BEGIN
+  -- students.status
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'students' AND column_name = 'status'
+  ) THEN
+    ALTER TABLE public.students
+      ADD COLUMN status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'graduated'));
+  END IF;
 
--- Student status for graduation tracking
-ALTER TABLE public.students
-  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active', 'graduated'));
-
--- Payment transaction cancellation fields
-ALTER TABLE public.payment_transactions
-  ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS cancelled_reason TEXT,
-  ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+  -- payment_transactions.is_cancelled
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'payment_transactions' AND column_name = 'is_cancelled'
+  ) THEN
+    ALTER TABLE public.payment_transactions
+      ADD COLUMN is_cancelled     BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN cancelled_reason TEXT,
+      ADD COLUMN cancelled_by     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+      ADD COLUMN cancelled_at     TIMESTAMPTZ;
+  END IF;
+END $$;
 
 -- ============================================================
 -- NEW TABLES

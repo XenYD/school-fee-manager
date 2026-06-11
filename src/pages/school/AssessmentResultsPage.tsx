@@ -504,6 +504,184 @@ export default function AssessmentResultsPage() {
     setBulkValue('')
   }
 
+  // ── Individual student report card PDF ────────────────────────────────────
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null)
+
+  async function generateStudentReportCard(summary: typeof studentSummaries[number]) {
+    if (!assessment) return
+    setDownloadingReport(summary.student.id)
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
+      const W = 148, margin = 12
+      const accent = [74, 144, 217] as [number, number, number]
+      const navy  = [15, 45, 82]  as [number, number, number]
+
+      // ── Header ──────────────────────────────────────────────────────────────
+      doc.setFillColor(...navy)
+      doc.rect(0, 0, W, 30, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13)
+      doc.setTextColor(255, 255, 255)
+      doc.text(schoolName || 'School', margin, 11)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(180, 200, 220)
+      doc.text('STUDENT RESULT CARD', margin, 18)
+      doc.text(
+        `Printed: ${new Date().toLocaleDateString('en-PK')}`,
+        W - margin, 18, { align: 'right' }
+      )
+
+      doc.setTextColor(...accent)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.text('Powered by FeeFlow', W - margin, 25, { align: 'right' })
+
+      // ── Student card ────────────────────────────────────────────────────────
+      let y = 36
+      doc.setFillColor(248, 249, 250)
+      doc.roundedRect(margin, y, W - margin * 2, 26, 2, 2, 'F')
+
+      // Avatar circle
+      doc.setFillColor(...accent)
+      doc.circle(margin + 10, y + 13, 7, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(255, 255, 255)
+      doc.text(
+        summary.student.name.charAt(0).toUpperCase(),
+        margin + 10, y + 17,
+        { align: 'center' }
+      )
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(20, 20, 20)
+      doc.text(summary.student.name, margin + 21, y + 10)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(80, 80, 80)
+      doc.text(assessment.class, margin + 21, y + 17)
+
+      // Assessment badge on the right
+      doc.setFillColor(...accent)
+      doc.roundedRect(W - margin - 36, y + 3, 32, 8, 2, 2, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(255, 255, 255)
+      doc.text(ASSESSMENT_TYPE_LABELS[assessment.type], W - margin - 20, y + 8.5, { align: 'center' })
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(80, 80, 80)
+      doc.text(assessment.name, W - margin - 20, y + 17, { align: 'center' })
+      doc.text(
+        new Date(assessment.date).toLocaleDateString('en-PK', {
+          day: 'numeric', month: 'long', year: 'numeric',
+        }),
+        W - margin - 20, y + 22, { align: 'center' }
+      )
+
+      y += 32
+
+      // ── Marks table ─────────────────────────────────────────────────────────
+      const tableRows = summary.subjectMarks.map((sm) => [
+        sm.subject,
+        sm.obtained !== null ? String(sm.obtained) : '—',
+        String(sm.maxMarks),
+        sm.obtained !== null
+          ? `${((sm.obtained / sm.maxMarks) * 100).toFixed(0)}%`
+          : '—',
+      ])
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Subject', 'Marks', 'Max', '%']],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: {
+          fillColor: navy,
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 8,
+          halign: 'center',
+        },
+        bodyStyles: { fontSize: 8.5, valign: 'middle' },
+        columnStyles: {
+          0: { cellWidth: 55 },
+          1: { halign: 'center', fontStyle: 'bold' },
+          2: { halign: 'center', textColor: [120, 120, 120] },
+          3: { halign: 'center' },
+        },
+        alternateRowStyles: { fillColor: [248, 249, 250] },
+        margin: { left: margin, right: margin },
+      })
+
+      y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+
+      // ── Summary row ─────────────────────────────────────────────────────────
+      doc.setFillColor(...navy)
+      doc.roundedRect(margin, y, W - margin * 2, 9, 1.5, 1.5, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8.5)
+      doc.setTextColor(255, 255, 255)
+      doc.text('TOTAL', margin + 4, y + 6)
+      doc.text(
+        summary.hasResults
+          ? `${summary.totalObtained} / ${summary.totalPossible}   (${summary.percentage.toFixed(1)}%)`
+          : '— / —',
+        W - margin - 4, y + 6,
+        { align: 'right' }
+      )
+      y += 14
+
+      // ── Grade badge ──────────────────────────────────────────────────────────
+      if (summary.hasResults) {
+        const gradeHex = getGradeColor(summary.grade)
+        const gr = parseInt(gradeHex.slice(1, 3), 16)
+        const gg = parseInt(gradeHex.slice(3, 5), 16)
+        const gb = parseInt(gradeHex.slice(5, 7), 16)
+
+        doc.setFillColor(gr, gg, gb)
+        doc.roundedRect((W - 40) / 2, y, 40, 16, 3, 3, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(14)
+        doc.setTextColor(255, 255, 255)
+        doc.text(`Grade ${summary.grade}`, W / 2, y + 11, { align: 'center' })
+        y += 22
+
+        // Grade scale hint
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.setTextColor(150, 150, 150)
+        doc.text('A+(90+)  A(80-89)  B(70-79)  C(60-69)  D(50-59)  Fail(<50)', W / 2, y, { align: 'center' })
+        y += 8
+      }
+
+      // ── Footer ───────────────────────────────────────────────────────────────
+      doc.setFillColor(...navy)
+      doc.rect(0, 199, W, 12, 'F')
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(7)
+      doc.setTextColor(180, 200, 220)
+      doc.text(
+        'Computer-generated result card by FeeFlow. No signature required.',
+        W / 2, 206.5, { align: 'center' }
+      )
+
+      const filename = `Result_${summary.student.name.replace(/ /g, '_')}_${assessment.name.replace(/ /g, '_')}.pdf`
+      doc.save(filename)
+      toast.success(`Report card downloaded for ${summary.student.name}`)
+    } catch {
+      toast.error('Failed to generate report card')
+    } finally {
+      setDownloadingReport(null)
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -708,7 +886,7 @@ export default function AssessmentResultsPage() {
                       style={{ borderColor: 'var(--c-border)' }}
                     >
                       <td
-                        className="px-4 py-2.5 sticky left-0 bg-white z-10 border-r"
+                        className="px-3 py-2 sticky left-0 bg-white z-10 border-r"
                         style={{ borderColor: 'var(--c-border)' }}
                       >
                         <div className="flex items-center gap-2">
@@ -718,9 +896,22 @@ export default function AssessmentResultsPage() {
                           >
                             {studentIdx + 1}
                           </span>
-                          <span className="font-medium text-gray-900 text-xs truncate max-w-[110px]">
+                          <span className="font-medium text-gray-900 text-xs truncate max-w-[100px]">
                             {summary.student.name}
                           </span>
+                          {/* Per-student report card download */}
+                          <button
+                            onClick={() => generateStudentReportCard(summary)}
+                            disabled={downloadingReport === summary.student.id}
+                            title={`Download report card for ${summary.student.name}`}
+                            className="ml-auto flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md transition-colors text-gray-300 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-50"
+                          >
+                            {downloadingReport === summary.student.id ? (
+                              <div className="h-3 w-3 border border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Download size={12} />
+                            )}
+                          </button>
                         </div>
                       </td>
 
